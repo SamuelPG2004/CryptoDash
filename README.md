@@ -1,20 +1,13 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# CryptoDash 🚀
 
-# Run and deploy your AI Studio app
+Plataforma Full-Stack de gestión de activos digitales con seguridad institucional y una interfaz neón de vanguardia.
 
-This contains everything you need to run your app locally.
+## ✨ Características
+* **Seguridad:** Registro validado para mayores de 18 años y cifrado de PIN.
+* **Tecnología:** Desarrollado con el stack MERN (MongoDB, Express, React, Node.js).
+* **Interfaz:** Diseño dark-mode optimizado con Tailwind CSS.
 
-View your app in AI Studio: https://ai.studio/apps/2d6cf34a-98b3-429b-97ee-a87b91e0689f
-
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 🛠️ Instalación
+1. git clone https://github.com/SamuelPG2004/CryptoDash.git
+2. npm install
+3. npm run dev
