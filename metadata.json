@@ -1,0 +1,5 @@
+{
+  "name": "CryptoDash",
+  "description": "A simplified cryptocurrency platform with user authentication, favorites, and real-time market data.",
+  "requestFramePermissions": []
+}
