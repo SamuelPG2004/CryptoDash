@@ -5,13 +5,24 @@ import { useAuth } from '../context/AuthContext.tsx';
 import { UserPlus, Mail, Lock, AlertCircle, User, Phone, Calendar, Globe, ShieldCheck, ArrowRight, ArrowLeft } from 'lucide-react';
 import { COUNTRIES } from '../constants.ts';
 
+const calculateAge = (birthDateString: string) => {
+  if (!birthDateString) return 0;
+  const today = new Date();
+  const birthDate = new Date(birthDateString);
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
 const Register: React.FC = () => {
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
     fullName: '',
-    age: '',
     country: 'México',
     phoneNumber: '',
     birthDate: '',
@@ -43,8 +54,8 @@ const Register: React.FC = () => {
     setError('');
 
     // Final validations
-    const ageNum = parseInt(formData.age);
-    if (isNaN(ageNum) || ageNum < 18) {
+    const ageNum = calculateAge(formData.birthDate);
+    if (ageNum < 18) {
       return setError('Debes ser mayor de 18 años para usar CryptoDash');
     }
 
@@ -134,7 +145,7 @@ const Register: React.FC = () => {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
+              <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1.5">Nombre Completo</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
@@ -148,20 +159,6 @@ const Register: React.FC = () => {
                     onChange={handleChange}
                   />
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1.5">Edad</label>
-                <input
-                  type="number"
-                  name="age"
-                  required
-                  min="18"
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-3 px-4 text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all duration-200"
-                  placeholder="25"
-                  value={formData.age}
-                  onChange={handleChange}
-                />
               </div>
             </div>
 
@@ -243,13 +240,13 @@ const Register: React.FC = () => {
               </button>
               <button
                 type="submit"
-                disabled={loading || (step === 2 && parseInt(formData.age) < 18)}
+                disabled={loading || (step === 2 && formData.birthDate ? calculateAge(formData.birthDate) < 18 : false)}
                 className="flex-[2] bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3.5 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 shadow-lg shadow-emerald-900/20 active:scale-95"
               >
                 {loading ? 'Creando cuenta...' : 'Completar Registro'}
               </button>
             </div>
-            {step === 2 && formData.age && parseInt(formData.age) < 18 && (
+            {step === 2 && formData.birthDate && calculateAge(formData.birthDate) < 18 && (
               <p className="text-rose-500 text-xs font-medium mt-2 text-center">
                 Debes ser mayor de 18 años para usar CryptoDash
               </p>
