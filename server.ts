@@ -7,34 +7,43 @@ import cryptoRoutes from "./src/backend/routes/cryptoRoutes.js";
 
 dotenv.config();
 
-// use an environment variable for the database, fall back to local Mongo
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/cryptodash";
 
-// reuse a single Express instance so it can be exported for serverless
 const app = express();
 app.use(express.json());
 
-// connect to Mongo once when the module is imported
+// Track connection state across serverless invocations
 let isConnected = false;
 
 export const connectToDatabase = async () => {
-  if (isConnected) {
+  if (isConnected && mongoose.connection.readyState === 1) {
     return;
   }
+
   try {
-    const db = await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000,
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
     });
-    isConnected = db.connections[0].readyState === 1;
+    isConnected = true;
     console.log("Connected to MongoDB successfully");
   } catch (err) {
+    isConnected = false;
     console.error("MongoDB connection error:", err);
+    throw err; // re-throw so callers know the connection failed
   }
 };
 
-// Immediately attempt connection on start
-connectToDatabase();
+// Middleware that guarantees DB is connected before any API request
+app.use("/api", async (req, res, next) => {
+  try {
+    await connectToDatabase();
+    next();
+  } catch (err) {
+    console.error("Failed to connect to database:", err);
+    res.status(500).json({ message: "No se pudo conectar a la base de datos" });
+  }
+});
 
 // API routes
 app.use("/api/auth", authRoutes);
@@ -65,12 +74,10 @@ if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
 
 // start listening only when running the file directly (not on Vercel)
 if (!process.env.VERCEL) {
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000; // allow override to avoid conflicts
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 
-// exporting the Express app enables Vercel's @vercel/node builder to use it as a handler
 export default app;
-
