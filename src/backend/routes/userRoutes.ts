@@ -1,12 +1,12 @@
 import express from 'express';
-import { 
-  getProfile, 
-  toggleFavorite, 
-  validatePin, 
-  updatePassword, 
-  updateProfile 
-} from '../controllers/userController.ts';
-import { protect } from '../middleware/auth.ts';
+import {
+  getProfile,
+  toggleFavorite,
+  validatePin,
+  updatePassword,
+  updateProfile
+} from '../controllers/userController.js';
+import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 

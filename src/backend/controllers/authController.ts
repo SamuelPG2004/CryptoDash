@@ -1,19 +1,19 @@
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
-import User from '../models/User.ts';
+import User from '../models/User.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
 export const register = async (req: Request, res: Response) => {
-  const { 
-    email, 
-    password, 
-    fullName, 
-    age, 
-    country, 
-    phoneNumber, 
-    birthDate, 
-    securityPin 
+  const {
+    email,
+    password,
+    fullName,
+    age,
+    country,
+    phoneNumber,
+    birthDate,
+    securityPin
   } = req.body;
 
   try {
@@ -26,15 +26,15 @@ export const register = async (req: Request, res: Response) => {
       return res.status(400).json({ message: 'Registro denegado: Solo mayores de 18 años.' });
     }
 
-    const user = await User.create({ 
-      email, 
-      password, 
-      fullName, 
-      age, 
-      country, 
-      phoneNumber, 
-      birthDate, 
-      securityPin 
+    const user = await User.create({
+      email,
+      password,
+      fullName,
+      age,
+      country,
+      phoneNumber,
+      birthDate,
+      securityPin
     });
 
     const token = jwt.sign({ id: user._id, email: user.email }, JWT_SECRET, { expiresIn: '30d' });

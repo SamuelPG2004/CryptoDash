@@ -1,10 +1,9 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
-import authRoutes from "./src/backend/routes/authRoutes.ts";
-import userRoutes from "./src/backend/routes/userRoutes.ts";
-import cryptoRoutes from "./src/backend/routes/cryptoRoutes.ts";
+import authRoutes from "./src/backend/routes/authRoutes.js";
+import userRoutes from "./src/backend/routes/userRoutes.js";
+import cryptoRoutes from "./src/backend/routes/cryptoRoutes.js";
 
 dotenv.config();
 
@@ -29,11 +28,16 @@ app.use("/api/crypto", cryptoRoutes);
 // Vite middleware for development (skipped on Vercel)
 if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
   (async () => {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } catch (err) {
+      console.error("Failed to start Vite dev server:", err);
+    }
   })();
 } else if (!process.env.VERCEL) {
   // when running a production build locally
@@ -45,7 +49,7 @@ if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
 
 // start listening only when running the file directly (not on Vercel)
 if (!process.env.VERCEL) {
-  const PORT = process.env.PORT || 3000; // allow override to avoid conflicts
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000; // allow override to avoid conflicts
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });

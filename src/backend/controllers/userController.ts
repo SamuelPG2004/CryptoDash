@@ -1,6 +1,6 @@
 import { Response } from 'express';
-import { AuthRequest } from '../middleware/auth.ts';
-import User from '../models/User.ts';
+import { AuthRequest } from '../middleware/auth.js';
+import User from '../models/User.js';
 
 export const getProfile = async (req: AuthRequest, res: Response) => {
   try {
