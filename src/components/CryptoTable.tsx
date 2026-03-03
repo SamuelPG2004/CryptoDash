@@ -33,6 +33,7 @@ interface Crypto {
 const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites }) => {
   const [cryptos, setCryptos] = useState<Crypto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCoinId, setSelectedCoinId] = useState<string | null>(null);
   const { user, updateFavorites } = useAuth();
@@ -54,11 +55,13 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
         }));
 
       setCryptos(formattedData);
+      setError(null);
       if (!selectedCoinId && formattedData.length > 0) {
         setSelectedCoinId(formattedData[0].id);
       }
     } catch (error) {
       console.error('Error fetching crypto prices:', error);
+      setError('No se pudieron cargar los datos del mercado. Reintentando...');
     } finally {
       setLoading(false);
     }
@@ -66,9 +69,11 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
 
   useEffect(() => {
     fetchPrices();
-    const interval = setInterval(fetchPrices, 15000); // Poll every 15 seconds as requested
+    // Poll every 5 minutes — aligned with backend cache to avoid CoinGecko rate limits
+    const interval = setInterval(fetchPrices, 5 * 60 * 1000);
     return () => clearInterval(interval);
   }, []);
+
 
   const toggleFav = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -116,6 +121,16 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
       </div>
     );
   }
+
+  if (error && cryptos.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center p-20 bg-zinc-950 rounded-xl border border-rose-800/30 border-dashed">
+        <p className="text-rose-400 font-medium">{error}</p>
+        <p className="text-zinc-600 text-xs mt-2">Usando datos de referencia mientras se restablece la conexión</p>
+      </div>
+    );
+  }
+
 
   return (
     <div className="space-y-6">

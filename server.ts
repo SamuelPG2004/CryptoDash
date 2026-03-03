@@ -34,8 +34,8 @@ export const connectToDatabase = async () => {
   }
 };
 
-// Middleware that guarantees DB is connected before any API request
-app.use("/api", async (req, res, next) => {
+// DB middleware — only routes that need MongoDB require a live connection
+const requireDB = async (req: any, res: any, next: any) => {
   try {
     await connectToDatabase();
     next();
@@ -43,11 +43,11 @@ app.use("/api", async (req, res, next) => {
     console.error("Failed to connect to database:", err);
     res.status(500).json({ message: "No se pudo conectar a la base de datos" });
   }
-});
+};
 
-// API routes
-app.use("/api/auth", authRoutes);
-app.use("/api/users", userRoutes);
+// API routes — crypto does NOT need MongoDB
+app.use("/api/auth", requireDB, authRoutes);
+app.use("/api/users", requireDB, userRoutes);
 app.use("/api/crypto", cryptoRoutes);
 
 // Vite middleware for development (skipped on Vercel)
