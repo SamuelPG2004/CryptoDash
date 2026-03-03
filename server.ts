@@ -20,6 +20,10 @@ export const connectToDatabase = async () => {
     return;
   }
 
+  // Log URI (masked) to confirm env var is being read correctly
+  const maskedURI = MONGODB_URI.replace(/:([^@]+)@/, ':****@');
+  console.log("Connecting to MongoDB:", maskedURI);
+
   try {
     await mongoose.connect(MONGODB_URI, {
       serverSelectionTimeoutMS: 10000,
@@ -27,10 +31,10 @@ export const connectToDatabase = async () => {
     });
     isConnected = true;
     console.log("Connected to MongoDB successfully");
-  } catch (err) {
+  } catch (err: any) {
     isConnected = false;
     console.error("MongoDB connection error:", err);
-    throw err; // re-throw so callers know the connection failed
+    throw err;
   }
 };
 
@@ -39,9 +43,14 @@ const requireDB = async (req: any, res: any, next: any) => {
   try {
     await connectToDatabase();
     next();
-  } catch (err) {
+  } catch (err: any) {
     console.error("Failed to connect to database:", err);
-    res.status(500).json({ message: "No se pudo conectar a la base de datos" });
+    // Include real error message to help diagnose the issue
+    res.status(500).json({
+      message: "No se pudo conectar a la base de datos",
+      error: err?.message || String(err),
+      uri: MONGODB_URI.replace(/:([^@]+)@/, ':****@')
+    });
   }
 };
 
