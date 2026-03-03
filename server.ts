@@ -15,10 +15,26 @@ const app = express();
 app.use(express.json());
 
 // connect to Mongo once when the module is imported
-mongoose
-  .connect(MONGODB_URI)
-  .then(() => console.log("Connected to MongoDB successfully"))
-  .catch((err) => console.error("MongoDB connection error:", err));
+let isConnected = false;
+
+export const connectToDatabase = async () => {
+  if (isConnected) {
+    return;
+  }
+  try {
+    const db = await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 45000,
+    });
+    isConnected = db.connections[0].readyState === 1;
+    console.log("Connected to MongoDB successfully");
+  } catch (err) {
+    console.error("MongoDB connection error:", err);
+  }
+};
+
+// Immediately attempt connection on start
+connectToDatabase();
 
 // API routes
 app.use("/api/auth", authRoutes);
