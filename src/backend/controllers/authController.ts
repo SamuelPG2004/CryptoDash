@@ -52,9 +52,12 @@ export const register = async (req: Request, res: Response) => {
       favorites: user.favorites,
       wallet: user.wallet
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Register error:', error);
-    res.status(500).json({ message: 'Error del servidor' });
+    res.status(500).json({
+      message: 'Error del servidor al registrarse',
+      error: error.message || error.toString()
+    });
   }
 };
 

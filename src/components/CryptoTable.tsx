@@ -4,13 +4,13 @@ import { useAuth } from '../context/AuthContext.tsx';
 import api from '../services/api.ts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { 
-  LineChart, 
-  Line, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  ResponsiveContainer, 
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
   CartesianGrid,
   AreaChart,
   Area
@@ -40,7 +40,7 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
   const fetchPrices = async () => {
     try {
       const { data } = await api.get('/crypto/prices');
-      
+
       const formattedData = data
         .filter((item: any) => item && item.id && item.symbol)
         .map((item: any) => ({
@@ -87,17 +87,17 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
       : cryptos;
 
     if (searchTerm) {
-      base = base.filter(c => 
-        (c.name && c.name.toLowerCase().includes(searchTerm.toLowerCase())) || 
+      base = base.filter(c =>
+        (c.name && c.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (c.symbol && c.symbol.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
     return base;
   }, [cryptos, searchTerm, filterFavorites, user?.favorites]);
 
-  const selectedCoin = useMemo(() => 
+  const selectedCoin = useMemo(() =>
     cryptos.find(c => c.id === selectedCoinId) || cryptos[0]
-  , [cryptos, selectedCoinId]);
+    , [cryptos, selectedCoinId]);
 
   const chartData = useMemo(() => {
     if (!selectedCoin?.sparkline) return [];
@@ -125,7 +125,7 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
             <TrendingUp size={200} className="text-emerald-500" />
           </div>
-          
+
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-4">
               <img src={selectedCoin.image} alt="" className="w-12 h-12 rounded-full" />
@@ -151,34 +151,34 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
             </div>
           </div>
 
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
+          <div className="h-[250px] w-full mt-6 w-full min-w-[200px]">
+            <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={200}>
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"} stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"} stopOpacity={0}/>
+                    <stop offset="5%" stopColor={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"} stopOpacity={0.3} />
+                    <stop offset="95%" stopColor={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"} stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
                 <XAxis hide dataKey="time" />
-                <YAxis 
-                  hide 
-                  domain={['auto', 'auto']} 
+                <YAxis
+                  hide
+                  domain={['auto', 'auto']}
                 />
-                <Tooltip 
+                <Tooltip
                   contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px' }}
                   itemStyle={{ color: '#fff' }}
                   labelStyle={{ display: 'none' }}
                   formatter={(value: number) => [`$${value.toLocaleString()}`, 'Price']}
                 />
-                <Area 
-                  type="monotone" 
-                  dataKey="price" 
-                  stroke={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"} 
+                <Area
+                  type="monotone"
+                  dataKey="price"
+                  stroke={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"}
                   strokeWidth={3}
-                  fillOpacity={1} 
-                  fill="url(#colorPrice)" 
+                  fillOpacity={1}
+                  fill="url(#colorPrice)"
                   animationDuration={1500}
                 />
               </AreaChart>
@@ -192,9 +192,9 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
         <div className="p-4 border-b border-zinc-800 flex items-center gap-4 bg-zinc-900/30">
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar criptomoneda... (BTC, Ethereum...)" 
+            <input
+              type="text"
+              placeholder="Buscar criptomoneda... (BTC, Ethereum...)"
               className="w-full bg-zinc-900 border border-zinc-800 rounded-xl py-2 pl-10 pr-4 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -217,8 +217,8 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
             </thead>
             <tbody className="divide-y divide-zinc-900">
               {filteredCryptos.map((crypto) => (
-                <tr 
-                  key={crypto.id} 
+                <tr
+                  key={crypto.id}
                   onClick={() => setSelectedCoinId(crypto.id)}
                   className={cn(
                     "hover:bg-zinc-900/50 transition-all duration-300 group cursor-pointer",
@@ -228,9 +228,9 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
                   <td className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-700">
-                        <img 
-                          src={crypto.image} 
-                          alt={crypto.name} 
+                        <img
+                          src={crypto.image}
+                          alt={crypto.name}
                           className="w-full h-full object-cover"
                           referrerPolicy="no-referrer"
                         />
@@ -247,21 +247,21 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
                   <td className="p-4">
                     <div className={cn(
                       "flex items-center gap-1 font-mono text-sm px-2 py-1 rounded-md w-fit",
-                      crypto.price_change_percentage_24h > 0 ? "text-emerald-400 bg-emerald-400/10" : 
-                      crypto.price_change_percentage_24h < 0 ? "text-rose-400 bg-rose-400/10" : "text-zinc-500 bg-zinc-800"
+                      crypto.price_change_percentage_24h > 0 ? "text-emerald-400 bg-emerald-400/10" :
+                        crypto.price_change_percentage_24h < 0 ? "text-rose-400 bg-rose-400/10" : "text-zinc-500 bg-zinc-800"
                     )}>
-                      {crypto.price_change_percentage_24h > 0 ? <ArrowUpRight size={14} /> : 
-                       crypto.price_change_percentage_24h < 0 ? <ArrowDownRight size={14} /> : null}
+                      {crypto.price_change_percentage_24h > 0 ? <ArrowUpRight size={14} /> :
+                        crypto.price_change_percentage_24h < 0 ? <ArrowDownRight size={14} /> : null}
                       {Math.abs(crypto.price_change_percentage_24h).toFixed(2)}%
                     </div>
                   </td>
                   <td className="p-4 text-right">
-                    <button 
+                    <button
                       onClick={(e) => toggleFav(e, crypto.id)}
                       className={cn(
                         "p-2 rounded-lg transition-all transform active:scale-90",
-                        user?.favorites.includes(crypto.id) 
-                          ? "text-yellow-500 bg-yellow-500/10" 
+                        user?.favorites.includes(crypto.id)
+                          ? "text-yellow-500 bg-yellow-500/10"
                           : "text-zinc-500 hover:text-white hover:bg-zinc-800"
                       )}
                     >
