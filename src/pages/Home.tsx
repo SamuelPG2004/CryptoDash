@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import CryptoTable from '../components/CryptoTable.tsx';
+import NewsPanel from '../components/NewsPanel.tsx';
 import { TrendingUp, Shield, Zap, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -43,83 +44,82 @@ const Home: React.FC = () => {
   return (
     <div className="min-h-screen bg-zinc-950">
       <MarketTicker />
-      
+
       <div className="relative overflow-hidden">
         {/* Hero Background Gradient */}
         <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/10 via-zinc-950 to-zinc-950 pointer-events-none" />
-        
+
         <div className="max-w-7xl mx-auto px-4 pt-24 pb-20 relative z-10">
           <header className="text-center mb-20">
             <div className="inline-flex items-center gap-2 text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20 mb-8">
-              <TrendingUp size={16} />
-              <span className="font-bold tracking-widest uppercase text-[10px]">Resumen del Mercado</span>
+              <span className="flex h-2 w-2 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="font-bold tracking-widest uppercase text-[10px]">Mercado en Vivo</span>
             </div>
-            
+
             <h1 className="text-5xl sm:text-8xl font-black text-white tracking-tighter mb-8 leading-[0.9] max-w-4xl mx-auto uppercase">
-              OPERA EL <span className="bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent drop-shadow-[0_0_15px_rgba(16,185,129,0.3)]">FUTURO</span> <br />
-              <span className="text-zinc-600">DE LAS FINANZAS.</span>
+              DOMINA EL <span className="bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(16,185,129,0.3)]">MERCADO</span> <br />
+              <span className="text-zinc-600 italic font-light lowercase">digital.</span>
             </h1>
 
             <p className="text-zinc-400 text-lg sm:text-xl max-w-2xl mx-auto mb-10 font-medium">
-              Experimenta la próxima generación en el comercio de activos digitales con seguridad de nivel institucional y ejecución ultrarrápida.
+              Datos precisos, noticias al instante y análisis técnico avanzado para potenciar tus inversiones en criptoactivos.
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-              <Link 
-                to="/register" 
+              <Link
+                to="/register"
                 className="group bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-emerald-500/20 flex items-center gap-3 active:scale-95"
               >
-                Empezar ahora <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                Crear Cuenta <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </Link>
-              <Link 
-                to="/login" 
+              <Link
+                to="/login"
                 className="text-zinc-400 hover:text-white font-bold px-10 py-4 transition-colors"
               >
                 Ver Mercados
               </Link>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-24">
-              <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800/50 p-8 rounded-3xl hover:border-emerald-500/30 transition-all group">
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Zap className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" size={24} />
-                </div>
-                <h3 className="text-white font-bold text-lg mb-3">Ejecución Instantánea</h3>
-                <p className="text-zinc-500 text-sm leading-relaxed">Compra y vende activos criptográficos con una velocidad asombrosa y latencia cero.</p>
-              </div>
-              
-              <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800/50 p-8 rounded-3xl hover:border-emerald-500/30 transition-all group">
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <Shield className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" size={24} />
-                </div>
-                <h3 className="text-white font-bold text-lg mb-3">Almacenamiento Seguro</h3>
-                <p className="text-zinc-500 text-sm leading-relaxed">Tus activos están protegidos por protocolos de seguridad líderes en la industria.</p>
-              </div>
-              
-              <div className="bg-zinc-900/40 backdrop-blur-sm border border-zinc-800/50 p-8 rounded-3xl hover:border-emerald-500/30 transition-all group">
-                <div className="w-12 h-12 bg-emerald-500/10 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <TrendingUp className="text-emerald-400 drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" size={24} />
-                </div>
-                <h3 className="text-white font-bold text-lg mb-3">Análisis en Vivo</h3>
-                <p className="text-zinc-500 text-sm leading-relaxed">Obtén datos de mercado en tiempo real y herramientas de gráficos avanzadas.</p>
-              </div>
-            </div>
           </header>
 
-          <section className="mt-20">
-            <div className="flex justify-between items-end mb-8">
-              <div>
-                <h2 className="text-3xl font-black text-white tracking-tight">Activos Principales</h2>
-                <p className="text-zinc-500 text-sm mt-1">Rendimiento del mercado en tiempo real</p>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-20">
+            {/* Main Content: Table & Charts */}
+            <div className="lg:col-span-2 space-y-8">
+              <div className="flex items-end justify-between">
+                <div>
+                  <h2 className="text-3xl font-black text-white tracking-tight">Activos Líderes</h2>
+                  <p className="text-zinc-500 text-sm mt-1">Sincronización global en tiempo real</p>
+                </div>
+                <div className="hidden sm:flex items-center gap-2 bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-800">
+                  <TrendingUp size={16} className="text-emerald-500" />
+                  <span className="text-[10px] font-black text-zinc-400 uppercase tracking-widest">Global Vol: $82.4B</span>
+                </div>
               </div>
-              <span className="text-zinc-600 text-[10px] font-black uppercase tracking-widest bg-zinc-900 px-3 py-1 rounded-full border border-zinc-800">
-                Transmisión en Vivo
-              </span>
+
+              <div className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-800/50 rounded-3xl overflow-hidden shadow-2xl">
+                <CryptoTable />
+              </div>
             </div>
-            <div className="bg-zinc-900/30 backdrop-blur-sm border border-zinc-800/50 rounded-3xl overflow-hidden">
-              <CryptoTable />
+
+            {/* Sidebar News */}
+            <div className="space-y-8">
+              <NewsPanel />
+
+              {/* Feature Cards in Sidebar */}
+              <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 p-8 rounded-3xl text-white shadow-2xl shadow-emerald-900/20 relative overflow-hidden group">
+                <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
+                  <Shield size={120} />
+                </div>
+                <h3 className="text-xl font-black mb-2">Seguridad VIP</h3>
+                <p className="text-emerald-100 text-sm leading-relaxed mb-6">Protegemos tus activos con los más altos estándares criptográficos.</p>
+                <button className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white text-xs font-bold uppercase tracking-widest py-3 px-6 rounded-xl transition-all">
+                  Saber más
+                </button>
+              </div>
             </div>
-          </section>
+          </div>
         </div>
       </div>
     </div>

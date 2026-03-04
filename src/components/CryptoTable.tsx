@@ -136,38 +136,55 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
     <div className="space-y-6">
       {/* Trend Chart Section */}
       {selectedCoin && (
-        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl overflow-hidden relative group">
+        <div className="bg-zinc-950 border border-zinc-800 rounded-3xl p-8 shadow-2xl overflow-hidden relative group">
           <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity pointer-events-none">
-            <TrendingUp size={200} className="text-emerald-500" />
+            <TrendingUp size={240} className="text-emerald-500" />
           </div>
 
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <img src={selectedCoin.image} alt="" className="w-12 h-12 rounded-full" />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8 relative z-10">
+            <div className="flex items-center gap-5">
+              <div className="relative">
+                <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full" />
+                <img src={selectedCoin.image} alt="" className="w-16 h-16 rounded-2xl relative border border-zinc-800 bg-zinc-900 p-2" />
+              </div>
               <div>
-                <h3 className="text-zinc-500 text-sm font-medium uppercase tracking-widest">Tendencia de Precio</h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-white">{selectedCoin.name}</span>
-                  <span className="text-zinc-500 font-mono text-sm">{selectedCoin.symbol}/USD</span>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.2em]">Análisis Técnico</span>
+                  <span className="h-1 w-1 rounded-full bg-emerald-500" />
+                  <span className="text-emerald-500 text-[10px] font-bold uppercase">En Vivo</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <h3 className="text-4xl font-black text-white tracking-tighter">{selectedCoin.name}</h3>
+                  <span className="text-zinc-500 font-mono text-lg bg-zinc-900 px-3 py-1 rounded-lg border border-zinc-800">
+                    {selectedCoin.symbol}
+                  </span>
                 </div>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-3xl font-bold text-white font-mono">
-                ${selectedCoin.current_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+
+            <div className="flex items-center gap-8 bg-zinc-900/50 backdrop-blur-md p-4 rounded-2xl border border-zinc-800">
+              <div className="text-right">
+                <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-1">Precio actual</div>
+                <div className="text-3xl font-black text-white font-mono">
+                  ${selectedCoin.current_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                </div>
               </div>
-              <div className={cn(
-                "text-sm font-mono flex items-center justify-end gap-1",
-                selectedCoin.price_change_percentage_24h >= 0 ? "text-emerald-400" : "text-rose-400"
-              )}>
-                {selectedCoin.price_change_percentage_24h >= 0 ? <ArrowUpRight size={16} /> : <ArrowDownRight size={16} />}
-                {Math.abs(selectedCoin.price_change_percentage_24h).toFixed(2)}% (24h)
+              <div className="h-10 w-px bg-zinc-800" />
+              <div className="text-right">
+                <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-1">24h Change</div>
+                <div className={cn(
+                  "text-xl font-black font-mono flex items-center justify-end gap-1",
+                  selectedCoin.price_change_percentage_24h >= 0 ? "text-emerald-400" : "text-rose-400"
+                )}>
+                  {selectedCoin.price_change_percentage_24h >= 0 ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
+                  {Math.abs(selectedCoin.price_change_percentage_24h).toFixed(2)}%
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="h-[250px] w-full mt-6 w-full min-w-[200px]">
-            <ResponsiveContainer width="100%" height="100%" minHeight={200} minWidth={200}>
+          <div className="h-[300px] w-full mt-6 relative z-10">
+            <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
@@ -182,22 +199,43 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
                   domain={['auto', 'auto']}
                 />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px' }}
-                  itemStyle={{ color: '#fff' }}
-                  labelStyle={{ display: 'none' }}
-                  formatter={(value: number) => [`$${value.toLocaleString()}`, 'Price']}
+                  cursor={{ stroke: '#27272a', strokeWidth: 2 }}
+                  content={({ active, payload }) => {
+                    if (active && payload && payload.length) {
+                      return (
+                        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl shadow-2xl backdrop-blur-md">
+                          <p className="text-zinc-500 text-[10px] font-black uppercase mb-1">Punto de Datos</p>
+                          <p className="text-white font-mono font-bold text-lg">
+                            ${(payload[0].value as number).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                          </p>
+                          <div className="mt-2 h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-emerald-500" style={{ width: '60%' }} />
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }}
                 />
                 <Area
                   type="monotone"
                   dataKey="price"
                   stroke={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"}
-                  strokeWidth={3}
+                  strokeWidth={4}
                   fillOpacity={1}
                   fill="url(#colorPrice)"
-                  animationDuration={1500}
+                  animationDuration={2000}
                 />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+
+          <div className="mt-6 flex items-center justify-between text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em]">
+            <span>Historial 7D</span>
+            <div className="flex gap-4">
+              <span className="text-emerald-500/50">MA(20): $62.4k</span>
+              <span className="text-rose-500/50">RSI: 58.2</span>
+            </div>
           </div>
         </div>
       )}
