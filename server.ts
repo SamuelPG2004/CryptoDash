@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import authRoutes from "./src/backend/routes/authRoutes.js";
 import userRoutes from "./src/backend/routes/userRoutes.js";
 import cryptoRoutes from "./src/backend/routes/cryptoRoutes.js";
+import newsRoutes from "./src/backend/routes/newsRoutes.js";
 
 dotenv.config();
 
@@ -58,6 +59,7 @@ const requireDB = async (req: any, res: any, next: any) => {
 app.use("/api/auth", requireDB, authRoutes);
 app.use("/api/users", requireDB, userRoutes);
 app.use("/api/crypto", cryptoRoutes);
+app.use("/api/news", newsRoutes);
 
 // Vite middleware for development (skipped on Vercel)
 if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
