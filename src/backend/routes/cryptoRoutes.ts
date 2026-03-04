@@ -37,7 +37,7 @@ router.get('/prices', async (req, res) => {
     const { data } = await axios.get(
       'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=true&price_change_percentage=24h',
       {
-        timeout: 10000,
+        timeout: 4500,
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'CryptoDash/1.0 (educational project)',
