@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.tsx';
 import api from '../services/api.ts';
-import { User, Mail, Globe, Calendar, Phone, Shield, Edit3, Lock, AlertCircle, CheckCircle2, X } from 'lucide-react';
+import { User, Mail, Globe, Calendar, Phone, Shield, Edit3, Lock, AlertCircle, CheckCircle2, X, Wallet, TrendingUp } from 'lucide-react';
 import { format } from 'date-fns';
 import { COUNTRIES } from '../constants.ts';
 
@@ -48,7 +48,7 @@ const Profile: React.FC = () => {
         setProfile(data);
         setSuccess('Profile updated successfully');
       }
-      
+
       setTimeout(() => {
         setModalType(null);
         setPin('');
@@ -80,7 +80,7 @@ const Profile: React.FC = () => {
           <div className="absolute top-0 right-0 p-12 opacity-5 pointer-events-none">
             <User size={160} className="text-emerald-500" />
           </div>
-          
+
           <div className="flex flex-col sm:flex-row items-center gap-8 relative z-10">
             <div className="w-32 h-32 rounded-full bg-emerald-600/20 border-4 border-zinc-800 flex items-center justify-center text-emerald-500 text-4xl font-bold shadow-inner">
               {profile.fullName?.charAt(0) || profile.email.charAt(0).toUpperCase()}
@@ -102,6 +102,56 @@ const Profile: React.FC = () => {
           </div>
         </div>
 
+        {/* Portfolio Section */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-8 opacity-5 pointer-events-none">
+            <TrendingUp size={120} className="text-emerald-500" />
+          </div>
+
+          <div className="flex items-center justify-between mb-8 relative z-10">
+            <h3 className="text-xl font-bold text-white flex items-center gap-3 uppercase tracking-tight">
+              <Wallet className="text-emerald-500" size={20} /> Mi Portafolio
+            </h3>
+            <div className="text-right">
+              <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-black mb-1">Saldo Disponible</p>
+              <p className="text-3xl font-black text-white font-mono">${profile.wallet?.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
+            {profile.portfolio?.length > 0 ? (
+              profile.portfolio.map((item: any) => (
+                <div key={item.coinId} className="bg-zinc-950/50 backdrop-blur-sm border border-zinc-800 p-5 rounded-2xl group hover:border-emerald-500/30 transition-all shadow-xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex flex-col">
+                      <span className="text-2xl font-black text-white leading-none uppercase">{item.symbol}</span>
+                      <span className="text-[10px] text-zinc-500 font-bold mt-1 uppercase tracking-widest">{item.coinId}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-emerald-400 font-mono font-bold">{item.amount.toFixed(6)}</span>
+                      <span className="text-[9px] text-zinc-600 uppercase font-black">Tokens</span>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-zinc-800/50 flex justify-between items-end">
+                    <div>
+                      <p className="text-zinc-600 text-[9px] uppercase font-black leading-none mb-1">Compra Promedio</p>
+                      <p className="text-white font-mono text-sm">${item.averagePrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    </div>
+                    <div className="h-8 w-8 bg-emerald-500/10 rounded-lg flex items-center justify-center">
+                      <TrendingUp size={16} className="text-emerald-500" />
+                    </div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-full py-20 text-center bg-zinc-950/30 border-2 border-zinc-800 border-dashed rounded-3xl">
+                <p className="text-zinc-500 font-bold uppercase tracking-widest text-xs">No tienes activos aún</p>
+                <p className="text-zinc-600 text-[10px] mt-2">Empieza a operar desde el Dashboard principal</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Details Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
@@ -118,13 +168,13 @@ const Profile: React.FC = () => {
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl flex flex-col justify-center gap-4">
             <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2">Acciones de Seguridad</h3>
-            <button 
+            <button
               onClick={() => { setModalType('edit'); setError(''); setSuccess(''); }}
               className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-3 border border-zinc-700"
             >
               <Edit3 size={18} /> Editar Detalles del Perfil
             </button>
-            <button 
+            <button
               onClick={() => { setModalType('password'); setError(''); setSuccess(''); }}
               className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-3 border border-zinc-700"
             >
@@ -137,7 +187,7 @@ const Profile: React.FC = () => {
         {modalType && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
             <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-8 shadow-2xl relative animate-in fade-in zoom-in duration-200">
-              <button 
+              <button
                 onClick={() => setModalType(null)}
                 className="absolute top-4 right-4 p-2 text-zinc-500 hover:text-white transition-colors"
               >
@@ -171,15 +221,15 @@ const Profile: React.FC = () => {
               <form onSubmit={handleAction} className="space-y-4">
                 {modalType === 'edit' && (
                   <div className="space-y-3 mb-6">
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       placeholder="Nombre Completo"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-emerald-500 transition-colors"
                       value={editData.fullName}
                       onChange={(e) => setEditData({ ...editData, fullName: e.target.value })}
                     />
-                    <input 
-                      type="tel" 
+                    <input
+                      type="tel"
                       placeholder="Número de Teléfono"
                       className="w-full bg-zinc-950 border border-zinc-800 rounded-lg py-2 px-4 text-white focus:outline-none focus:border-emerald-500 transition-colors"
                       value={editData.phoneNumber}
@@ -198,8 +248,8 @@ const Profile: React.FC = () => {
                 {modalType === 'password' && (
                   <div className="mb-6">
                     <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1.5">Nueva Contraseña</label>
-                    <input 
-                      type="password" 
+                    <input
+                      type="password"
                       placeholder="••••••••"
                       required
                       minLength={6}
@@ -212,8 +262,8 @@ const Profile: React.FC = () => {
 
                 <div>
                   <label className="block text-xs font-medium text-zinc-400 uppercase tracking-wider mb-1.5">PIN de Seguridad</label>
-                  <input 
-                    type="password" 
+                  <input
+                    type="password"
                     placeholder="••••"
                     required
                     pattern="[0-9]*"
@@ -224,7 +274,7 @@ const Profile: React.FC = () => {
                   />
                 </div>
 
-                <button 
+                <button
                   type="submit"
                   disabled={submitting || !!success}
                   className="w-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white font-bold py-3 rounded-xl transition-all mt-4"

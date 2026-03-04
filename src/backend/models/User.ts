@@ -12,6 +12,12 @@ export interface IUser extends Document {
   securityPin: string;
   favorites: string[];
   wallet: number;
+  portfolio: {
+    coinId: string;
+    symbol: string;
+    amount: number;
+    averagePrice: number;
+  }[];
   createdAt: Date;
   comparePassword: (password: string) => Promise<boolean>;
   comparePin: (pin: string) => Promise<boolean>;
@@ -61,13 +67,19 @@ const userSchema = new mongoose.Schema({
   wallet: {
     type: Number,
     default: 10000.0
-  }
+  },
+  portfolio: [{
+    coinId: { type: String, required: true },
+    symbol: { type: String, required: true },
+    amount: { type: Number, required: true, default: 0 },
+    averagePrice: { type: Number, required: true, default: 0 }
+  }]
 }, {
   timestamps: true
 });
 
 // Hash password and PIN before saving
-userSchema.pre<IUser>('save', async function() {
+userSchema.pre<IUser>('save', async function () {
   if (this.isModified('password')) {
     this.password = await bcrypt.hash(this.password, 10);
   }
@@ -77,12 +89,12 @@ userSchema.pre<IUser>('save', async function() {
 });
 
 // Method to compare password
-userSchema.methods.comparePassword = async function(candidatePassword: string) {
+userSchema.methods.comparePassword = async function (candidatePassword: string) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
 // Method to compare security PIN
-userSchema.methods.comparePin = async function(candidatePin: string) {
+userSchema.methods.comparePin = async function (candidatePin: string) {
   return await bcrypt.compare(candidatePin, this.securityPin);
 };
 

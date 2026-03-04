@@ -4,7 +4,9 @@ import {
   toggleFavorite,
   validatePin,
   updatePassword,
-  updateProfile
+  updateProfile,
+  buyCrypto,
+  sellCrypto
 } from '../controllers/userController.js';
 import { protect } from '../middleware/auth.js';
 
@@ -15,5 +17,7 @@ router.post('/favorites', protect, toggleFavorite);
 router.post('/validate-pin', protect, validatePin);
 router.put('/password', protect, updatePassword);
 router.put('/profile', protect, updateProfile);
+router.post('/buy', protect, buyCrypto);
+router.post('/sell', protect, sellCrypto);
 
 export default router;

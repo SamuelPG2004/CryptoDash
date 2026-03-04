@@ -97,3 +97,74 @@ export const toggleFavorite = async (req: AuthRequest, res: Response) => {
     res.status(500).json({ message: 'Error del servidor' });
   }
 };
+
+export const buyCrypto = async (req: AuthRequest, res: Response) => {
+  const { coinId, symbol, amount, price } = req.body;
+  try {
+    const user = await User.findById(req.user?.id);
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    const totalCost = amount * price;
+    if (user.wallet < totalCost) {
+      return res.status(400).json({ message: 'Saldo insuficiente en tu wallet' });
+    }
+
+    // Update wallet
+    user.wallet -= totalCost;
+
+    // Update portfolio
+    const itemIndex = user.portfolio.findIndex(p => p.coinId === coinId);
+    if (itemIndex > -1) {
+      const currentItem = user.portfolio[itemIndex];
+      const newAmount = currentItem.amount + amount;
+      const newAveragePrice = ((currentItem.amount * currentItem.averagePrice) + totalCost) / newAmount;
+
+      user.portfolio[itemIndex].amount = newAmount;
+      user.portfolio[itemIndex].averagePrice = newAveragePrice;
+    } else {
+      user.portfolio.push({
+        coinId,
+        symbol,
+        amount,
+        averagePrice: price
+      });
+    }
+
+    await user.save();
+    res.json(user);
+  } catch (error) {
+    console.error('Error buying crypto:', error);
+    res.status(500).json({ message: 'Error al procesar la compra' });
+  }
+};
+
+export const sellCrypto = async (req: AuthRequest, res: Response) => {
+  const { coinId, amount, price } = req.body;
+  try {
+    const user = await User.findById(req.user?.id);
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    const itemIndex = user.portfolio.findIndex(p => p.coinId === coinId);
+    if (itemIndex === -1 || user.portfolio[itemIndex].amount < amount) {
+      return res.status(400).json({ message: 'No tienes suficientes activos para vender' });
+    }
+
+    // Update wallet
+    const totalEarnings = amount * price;
+    user.wallet += totalEarnings;
+
+    // Update portfolio
+    user.portfolio[itemIndex].amount -= amount;
+
+    // Remove if zero
+    if (user.portfolio[itemIndex].amount === 0) {
+      user.portfolio.splice(itemIndex, 1);
+    }
+
+    await user.save();
+    res.json(user);
+  } catch (error) {
+    console.error('Error selling crypto:', error);
+    res.status(500).json({ message: 'Error al procesar la venta' });
+  }
+};

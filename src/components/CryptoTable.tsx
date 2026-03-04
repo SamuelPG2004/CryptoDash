@@ -36,7 +36,50 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCoinId, setSelectedCoinId] = useState<string | null>(null);
-  const { user, updateFavorites } = useAuth();
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const { user, updateFavorites, updateUser } = useAuth();
+
+  const handleTrade = async (type: 'buy' | 'sell') => {
+    if (!user) return alert('Debes iniciar sesión para operar');
+    if (!selectedCoin) return;
+
+    const amount = parseFloat(prompt(`¿Cuánto ${selectedCoin.symbol} deseas ${type === 'buy' ? 'comprar' : 'vender'}?`) || '0');
+    if (amount <= 0 || isNaN(amount)) return;
+
+    try {
+      const { data } = await api.post(`/users/${type}`, {
+        coinId: selectedCoin.id,
+        symbol: selectedCoin.symbol,
+        amount,
+        price: selectedCoin.current_price
+      });
+      updateUser(data);
+      alert(`${type === 'buy' ? 'Compra' : 'Venta'} exitosa de ${amount} ${selectedCoin.symbol}`);
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Error en la operación');
+    }
+  };
+
+  const handleAskAI = async () => {
+    if (!selectedCoin) return;
+    setIsAnalyzing(true);
+    setAiAnalysis(null);
+    try {
+      const { data } = await api.post('/crypto/analyze', {
+        coinName: selectedCoin.name,
+        coinSymbol: selectedCoin.symbol,
+        currentPrice: selectedCoin.current_price,
+        change24h: selectedCoin.price_change_percentage_24h
+      });
+      setAiAnalysis(data.analysis);
+    } catch (err) {
+      console.error(err);
+      setAiAnalysis("Error al obtener análisis de IA. Verifica tu API Key de Gemini.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   const fetchPrices = async () => {
     try {
@@ -162,72 +205,119 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
               </div>
             </div>
 
-            <div className="flex items-center gap-8 bg-zinc-900/50 backdrop-blur-md p-4 rounded-2xl border border-zinc-800">
-              <div className="text-right">
-                <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-1">Precio actual</div>
-                <div className="text-3xl font-black text-white font-mono">
-                  ${selectedCoin.current_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            <div className="flex flex-col items-end gap-3 relative z-10">
+              <div className="flex items-center gap-8 bg-zinc-900/50 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 shadow-xl">
+                <div className="text-right">
+                  <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-1">Precio actual</div>
+                  <div className="text-3xl font-black text-white font-mono">
+                    ${selectedCoin.current_price.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
+                <div className="h-10 w-px bg-zinc-800" />
+                <div className="text-right">
+                  <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-1">24h Change</div>
+                  <div className={cn(
+                    "text-xl font-black font-mono flex items-center justify-end gap-1",
+                    selectedCoin.price_change_percentage_24h >= 0 ? "text-emerald-400" : "text-rose-400"
+                  )}>
+                    {selectedCoin.price_change_percentage_24h >= 0 ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
+                    {Math.abs(selectedCoin.price_change_percentage_24h).toFixed(2)}%
+                  </div>
                 </div>
               </div>
-              <div className="h-10 w-px bg-zinc-800" />
-              <div className="text-right">
-                <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-1">24h Change</div>
-                <div className={cn(
-                  "text-xl font-black font-mono flex items-center justify-end gap-1",
-                  selectedCoin.price_change_percentage_24h >= 0 ? "text-emerald-400" : "text-rose-400"
-                )}>
-                  {selectedCoin.price_change_percentage_24h >= 0 ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />}
-                  {Math.abs(selectedCoin.price_change_percentage_24h).toFixed(2)}%
-                </div>
+
+              {/* Trading Actions */}
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleTrade('buy')}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-900/20 active:scale-95 flex items-center gap-2"
+                >
+                  Comprar
+                </button>
+                <button
+                  onClick={() => handleTrade('sell')}
+                  className="bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all active:scale-95 flex items-center gap-2"
+                >
+                  Vender
+                </button>
               </div>
             </div>
           </div>
 
-          <div className="h-[300px] w-full mt-6 relative z-10">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"} stopOpacity={0.3} />
-                    <stop offset="95%" stopColor={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"} stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
-                <XAxis hide dataKey="time" />
-                <YAxis
-                  hide
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip
-                  cursor={{ stroke: '#27272a', strokeWidth: 2 }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      return (
-                        <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl shadow-2xl backdrop-blur-md">
-                          <p className="text-zinc-500 text-[10px] font-black uppercase mb-1">Punto de Datos</p>
-                          <p className="text-white font-mono font-bold text-lg">
-                            ${(payload[0].value as number).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                          </p>
-                          <div className="mt-2 h-1 w-full bg-zinc-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500" style={{ width: '60%' }} />
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-6 relative z-10">
+            <div className="lg:col-span-3 h-[300px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#18181b" vertical={false} />
+                  <XAxis hide dataKey="time" />
+                  <YAxis hide domain={['auto', 'auto']} />
+                  <Tooltip
+                    cursor={{ stroke: '#27272a', strokeWidth: 2 }}
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        return (
+                          <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl shadow-2xl backdrop-blur-md">
+                            <p className="text-zinc-500 text-[10px] font-black uppercase mb-1">Punto de Datos</p>
+                            <p className="text-white font-mono font-bold text-lg">
+                              ${(payload[0].value as number).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
                           </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="price"
-                  stroke={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"}
-                  strokeWidth={4}
-                  fillOpacity={1}
-                  fill="url(#colorPrice)"
-                  animationDuration={2000}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="price"
+                    stroke={selectedCoin.price_change_percentage_24h >= 0 ? "#10b981" : "#fb7185"}
+                    strokeWidth={4}
+                    fillOpacity={1}
+                    fill="url(#colorPrice)"
+                    animationDuration={2000}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* AI Insights Sidebar */}
+            <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl p-6 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <TrendingUp className="text-purple-400" size={16} />
+                  </div>
+                  <h4 className="text-white font-bold text-sm tracking-tight uppercase">AI Insights</h4>
+                </div>
+
+                {aiAnalysis ? (
+                  <p className="text-zinc-400 text-xs leading-relaxed italic border-l-2 border-purple-500/30 pl-3">
+                    {aiAnalysis}
+                  </p>
+                ) : (
+                  <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest text-center py-10">
+                    Pulsa para analizar tendencia
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={handleAskAI}
+                disabled={isAnalyzing}
+                className={cn(
+                  "mt-4 w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2",
+                  isAnalyzing ? "bg-zinc-800 text-zinc-500 animate-pulse" : "bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/20"
+                )}
+              >
+                {isAnalyzing ? "Generando..." : "Analizar con IA"}
+              </button>
+            </div>
           </div>
 
           <div className="mt-6 flex items-center justify-between text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em]">
