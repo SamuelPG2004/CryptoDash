@@ -6,18 +6,31 @@ import {
   updatePassword,
   updateProfile,
   buyCrypto,
-  sellCrypto
+  sellCrypto,
 } from '../controllers/userController.js';
 import { protect } from '../middleware/auth.js';
+import { validate } from '../middleware/validate.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { tradeLimiter } from '../middleware/rateLimiter.js';
+import {
+  updateProfileSchema,
+  updatePasswordSchema,
+  validatePinSchema,
+  toggleFavoriteSchema,
+} from '../validators/userValidators.js';
+import { buySchema, sellSchema } from '../validators/cryptoValidators.js';
 
 const router = express.Router();
 
-router.get('/profile', protect, getProfile);
-router.post('/favorites', protect, toggleFavorite);
-router.post('/validate-pin', protect, validatePin);
-router.put('/password', protect, updatePassword);
-router.put('/profile', protect, updateProfile);
-router.post('/buy', protect, buyCrypto);
-router.post('/sell', protect, sellCrypto);
+// All user routes require authentication
+router.get('/profile', protect, asyncHandler(getProfile));
+router.post('/favorites', protect, validate(toggleFavoriteSchema), asyncHandler(toggleFavorite));
+router.post('/validate-pin', protect, validate(validatePinSchema), asyncHandler(validatePin));
+router.put('/password', protect, validate(updatePasswordSchema), asyncHandler(updatePassword));
+router.put('/profile', protect, validate(updateProfileSchema), asyncHandler(updateProfile));
+
+// Trading routes — rate limited + validated
+router.post('/buy', protect, tradeLimiter, validate(buySchema), asyncHandler(buyCrypto));
+router.post('/sell', protect, tradeLimiter, validate(sellSchema), asyncHandler(sellCrypto));
 
 export default router;

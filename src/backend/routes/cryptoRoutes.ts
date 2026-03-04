@@ -1,19 +1,17 @@
 import express from 'express';
 import axios from 'axios';
-// Note: Google Generative AI usage moved to newsRoutes to avoid importing
-// heavy/optional dependencies in the crypto price route which must remain
-// lightweight and reliable for CoinGecko fetches.
+import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 
-// Cache duration: 5 minutes — prevents CoinGecko rate limit 429
-// Note: in Vercel serverless this cache resets on cold starts, but
-// 5 minutes is enough to handle traffic bursts within a warm instance.
+// ─── Cache configuration ────────────────────────────────────────────────
+// 5-minute cache prevents CoinGecko rate limit (429).
+// In Vercel serverless, cache resets on cold starts but handles traffic bursts within warm instances.
 let cachedPrices: any = null;
 let lastFetchTime = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const CACHE_DURATION = 5 * 60 * 1000;
 
-// Comprehensive mock data for top 10 coins — used as fallback when CoinGecko is unavailable
+// ─── Mock data fallback ─────────────────────────────────────────────────
 const MOCK_DATA = [
   { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', price: 64000, change: 1.2, image: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png', sparkline: Array.from({ length: 168 }, (_, i) => 64000 + Math.sin(i / 10) * 2000 + Math.random() * 500) },
   { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', price: 3400, change: -0.5, image: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png', sparkline: Array.from({ length: 168 }, (_, i) => 3400 + Math.sin(i / 8) * 150 + Math.random() * 50) },
@@ -27,7 +25,8 @@ const MOCK_DATA = [
   { id: 'chainlink', symbol: 'LINK', name: 'Chainlink', price: 14, change: 0.9, image: 'https://assets.coingecko.com/coins/images/877/small/chainlink-new-logo.png', sparkline: Array.from({ length: 168 }, (_, i) => 14 + Math.sin(i / 8) * 0.5 + Math.random() * 0.1) },
 ];
 
-router.get('/prices', async (req, res) => {
+// ─── GET /api/crypto/prices ─────────────────────────────────────────────
+router.get('/prices', async (_req, res) => {
   const now = Date.now();
 
   // Return cached data if fresh
@@ -43,8 +42,8 @@ router.get('/prices', async (req, res) => {
         headers: {
           'Accept': 'application/json',
           'User-Agent': 'CryptoDash/1.0 (educational project)',
-        }
-      }
+        },
+      },
     );
 
     const formattedData = data
@@ -56,7 +55,7 @@ router.get('/prices', async (req, res) => {
         price: coin.current_price || 0,
         change: coin.price_change_percentage_24h || 0,
         image: coin.image || '',
-        sparkline: coin.sparkline_in_7d?.price || []
+        sparkline: coin.sparkline_in_7d?.price || [],
       }));
 
     cachedPrices = formattedData;
@@ -64,7 +63,7 @@ router.get('/prices', async (req, res) => {
 
     res.json(formattedData);
   } catch (error: any) {
-    console.error('Error proxying crypto prices:', error.message);
+    logger.warn('CoinGecko fetch failed, using fallback', { error: error.message });
 
     // Return stale cache before mock data
     if (cachedPrices) {
@@ -74,14 +73,6 @@ router.get('/prices', async (req, res) => {
     // Fallback: return mock data so the UI always shows something
     res.json(MOCK_DATA);
   }
-});
-
-router.post('/analyze', async (req, res) => {
-  // This endpoint previously used Google Generative AI directly inside the
-  // crypto routes. The AI logic is now isolated in `newsRoutes` to avoid
-  // introducing a runtime dependency for the pricing endpoints that must
-  // remain minimal for Vercel serverless environments.
-  res.status(501).json({ message: 'Analyze endpoint moved to /api/news/analyze' });
 });
 
 export default router;

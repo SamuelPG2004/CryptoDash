@@ -66,7 +66,7 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
     setIsAnalyzing(true);
     setAiAnalysis(null);
     try {
-      const { data } = await api.post('/crypto/analyze', {
+      const { data } = await api.post('/news/analyze', {
         coinName: selectedCoin.name,
         coinSymbol: selectedCoin.symbol,
         currentPrice: selectedCoin.current_price,

@@ -1,93 +1,69 @@
-import express from "express";
-import dotenv from "dotenv";
-import mongoose from "mongoose";
-import authRoutes from "./src/backend/routes/authRoutes.js";
-import userRoutes from "./src/backend/routes/userRoutes.js";
-import cryptoRoutes from "./src/backend/routes/cryptoRoutes.js";
-import newsRoutes from "./src/backend/routes/newsRoutes.js";
+import express from 'express';
+import helmet from 'helmet';
+import { env, validateEnv } from './src/backend/config/env.js';
+import { requireDB } from './src/backend/config/db.js';
+import { errorHandler } from './src/backend/middleware/errorHandler.js';
+import { generalLimiter } from './src/backend/middleware/rateLimiter.js';
+import authRoutes from './src/backend/routes/authRoutes.js';
+import userRoutes from './src/backend/routes/userRoutes.js';
+import cryptoRoutes from './src/backend/routes/cryptoRoutes.js';
+import newsRoutes from './src/backend/routes/newsRoutes.js';
 
-dotenv.config();
-
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb://localhost:27017/cryptodash";
+// ─── Validate environment on startup ─────────────────────────────────────
+validateEnv();
 
 const app = express();
-app.use(express.json());
 
-// Track connection state across serverless invocations
-let isConnected = false;
+// ─── Security middleware ──────────────────────────────────────────────────
+app.use(helmet({
+  // Allow inline scripts/styles for React SPA
+  contentSecurityPolicy: false,
+}));
+app.use(express.json({ limit: '1mb' }));
 
-export const connectToDatabase = async () => {
-  if (isConnected && mongoose.connection.readyState === 1) {
-    return;
-  }
+// ─── General rate limiter (100 req/min per IP) ───────────────────────────
+app.use('/api', generalLimiter);
 
-  // Log URI (masked) to confirm env var is being read correctly
-  const maskedURI = MONGODB_URI.replace(/:([^@]+)@/, ':****@');
-  console.log("Connecting to MongoDB:", maskedURI);
+// ─── API routes ──────────────────────────────────────────────────────────
+// Auth and User routes require MongoDB connection (via requireDB middleware)
+app.use('/api/auth', requireDB, authRoutes);
+app.use('/api/users', requireDB, userRoutes);
 
-  try {
-    await mongoose.connect(MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-    });
-    isConnected = true;
-    console.log("Connected to MongoDB successfully");
-  } catch (err: any) {
-    isConnected = false;
-    console.error("MongoDB connection error:", err);
-    throw err;
-  }
-};
+// Crypto prices do NOT need MongoDB — uses CoinGecko API with caching
+app.use('/api/crypto', cryptoRoutes);
 
-// DB middleware — only routes that need MongoDB require a live connection
-const requireDB = async (req: any, res: any, next: any) => {
-  try {
-    await connectToDatabase();
-    next();
-  } catch (err: any) {
-    console.error("Failed to connect to database:", err);
-    // Include real error message to help diagnose the issue
-    res.status(500).json({
-      message: "No se pudo conectar a la base de datos",
-      error: err?.message || String(err),
-      uri: MONGODB_URI.replace(/:([^@]+)@/, ':****@')
-    });
-  }
-};
+// News/AI analysis does NOT need MongoDB — uses Gemini API
+app.use('/api/news', newsRoutes);
 
-// API routes — crypto does NOT need MongoDB
-app.use("/api/auth", requireDB, authRoutes);
-app.use("/api/users", requireDB, userRoutes);
-app.use("/api/crypto", cryptoRoutes);
-app.use("/api/news", newsRoutes);
+// ─── Centralized error handler (MUST be after all routes) ────────────────
+app.use(errorHandler);
 
-// Vite middleware for development (skipped on Vercel)
-if (!process.env.VERCEL && process.env.NODE_ENV !== "production") {
+// ─── Vite dev server (only in local development, skipped on Vercel) ──────
+if (!env.IS_VERCEL && env.NODE_ENV !== 'production') {
   (async () => {
     try {
-      const { createServer: createViteServer } = await import("vite");
+      const { createServer: createViteServer } = await import('vite');
       const vite = await createViteServer({
         server: { middlewareMode: true },
-        appType: "spa",
+        appType: 'spa',
       });
       app.use(vite.middlewares);
     } catch (err) {
-      console.error("Failed to start Vite dev server:", err);
+      console.error('Failed to start Vite dev server:', err);
     }
   })();
-} else if (!process.env.VERCEL) {
-  // when running a production build locally
-  app.use(express.static("dist"));
-  app.get("*", (req, res) => {
-    res.sendFile("dist/index.html", { root: "." });
+} else if (!env.IS_VERCEL) {
+  // Production build served locally
+  app.use(express.static('dist'));
+  app.get('*', (_req, res) => {
+    res.sendFile('dist/index.html', { root: '.' });
   });
 }
 
-// start listening only when running the file directly (not on Vercel)
-if (!process.env.VERCEL) {
-  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+// ─── Start HTTP server (only when running directly, not on Vercel) ───────
+if (!env.IS_VERCEL) {
+  app.listen(env.PORT, '0.0.0.0', () => {
+    console.log(`🚀 Server running on http://localhost:${env.PORT}`);
   });
 }
 

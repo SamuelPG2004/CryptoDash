@@ -1,8 +1,13 @@
-import { Response } from 'express';
+import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.js';
 import User from '../models/User.js';
+import { logger } from '../utils/logger.js';
 
-export const getProfile = async (req: AuthRequest, res: Response) => {
+/**
+ * GET /api/users/profile
+ * Returns the authenticated user's profile (excluding password and PIN).
+ */
+export const getProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const user = await User.findById(req.user?.id).select('-password -securityPin');
     if (!user) {
@@ -10,11 +15,15 @@ export const getProfile = async (req: AuthRequest, res: Response) => {
     }
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Error del servidor' });
+    next(error);
   }
 };
 
-export const validatePin = async (req: AuthRequest, res: Response) => {
+/**
+ * POST /api/users/validate-pin
+ * Validates the user's security PIN. Input pre-validated by Zod.
+ */
+export const validatePin = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const { pin } = req.body;
   try {
     const user = await User.findById(req.user?.id);
@@ -22,16 +31,22 @@ export const validatePin = async (req: AuthRequest, res: Response) => {
 
     const isMatch = await user.comparePin(pin);
     if (!isMatch) {
+      logger.audit('PIN_VALIDATION_FAILED', req.user?.id || 'unknown', {});
       return res.status(400).json({ message: 'PIN incorrecto' });
     }
 
     res.json({ success: true });
   } catch (error) {
-    res.status(500).json({ message: 'Error del servidor' });
+    next(error);
   }
 };
 
-export const updatePassword = async (req: AuthRequest, res: Response) => {
+/**
+ * PUT /api/users/password
+ * Changes the user's password. Requires security PIN confirmation.
+ * Input pre-validated by Zod (updatePasswordSchema).
+ */
+export const updatePassword = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const { pin, newPassword } = req.body;
   try {
     const user = await User.findById(req.user?.id);
@@ -45,13 +60,20 @@ export const updatePassword = async (req: AuthRequest, res: Response) => {
     user.password = newPassword;
     await user.save();
 
+    logger.audit('PASSWORD_CHANGED', req.user?.id || 'unknown', { email: user.email });
+
     res.json({ message: 'Contraseña actualizada con éxito' });
   } catch (error) {
-    res.status(500).json({ message: 'Error del servidor' });
+    next(error);
   }
 };
 
-export const updateProfile = async (req: AuthRequest, res: Response) => {
+/**
+ * PUT /api/users/profile
+ * Updates user profile fields. Requires security PIN confirmation.
+ * Input pre-validated by Zod (updateProfileSchema).
+ */
+export const updateProfile = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const { pin, fullName, age, country, phoneNumber, birthDate } = req.body;
   try {
     const user = await User.findById(req.user?.id);
@@ -72,13 +94,21 @@ export const updateProfile = async (req: AuthRequest, res: Response) => {
     if (birthDate) user.birthDate = birthDate;
 
     await user.save();
+
+    logger.audit('PROFILE_UPDATED', req.user?.id || 'unknown', { email: user.email });
+
     res.json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Error del servidor' });
+    next(error);
   }
 };
 
-export const toggleFavorite = async (req: AuthRequest, res: Response) => {
+/**
+ * POST /api/users/favorites
+ * Toggles a cryptocurrency in the user's favorites list.
+ * Input pre-validated by Zod (toggleFavoriteSchema).
+ */
+export const toggleFavorite = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const { cryptoId } = req.body;
   try {
     const user = await User.findById(req.user?.id);
@@ -94,11 +124,16 @@ export const toggleFavorite = async (req: AuthRequest, res: Response) => {
     await user.save();
     res.json({ favorites: user.favorites });
   } catch (error) {
-    res.status(500).json({ message: 'Error del servidor' });
+    next(error);
   }
 };
 
-export const buyCrypto = async (req: AuthRequest, res: Response) => {
+/**
+ * POST /api/users/buy
+ * Buys cryptocurrency with virtual USD. Validates sufficient balance.
+ * Input pre-validated by Zod (buySchema).
+ */
+export const buyCrypto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const { coinId, symbol, amount, price } = req.body;
   try {
     const user = await User.findById(req.user?.id);
@@ -122,23 +157,29 @@ export const buyCrypto = async (req: AuthRequest, res: Response) => {
       user.portfolio[itemIndex].amount = newAmount;
       user.portfolio[itemIndex].averagePrice = newAveragePrice;
     } else {
-      user.portfolio.push({
-        coinId,
-        symbol,
-        amount,
-        averagePrice: price
-      });
+      user.portfolio.push({ coinId, symbol, amount, averagePrice: price });
     }
 
     await user.save();
+
+    logger.audit('CRYPTO_BUY', req.user?.id || 'unknown', {
+      coinId, symbol, amount, price, totalCost,
+      newWalletBalance: user.wallet,
+    });
+
     res.json(user);
   } catch (error) {
-    console.error('Error buying crypto:', error);
-    res.status(500).json({ message: 'Error al procesar la compra' });
+    logger.error('Error buying crypto', { error: (error as any).message, coinId });
+    next(error);
   }
 };
 
-export const sellCrypto = async (req: AuthRequest, res: Response) => {
+/**
+ * POST /api/users/sell
+ * Sells cryptocurrency for virtual USD. Validates sufficient holdings.
+ * Input pre-validated by Zod (sellSchema).
+ */
+export const sellCrypto = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const { coinId, amount, price } = req.body;
   try {
     const user = await User.findById(req.user?.id);
@@ -162,9 +203,15 @@ export const sellCrypto = async (req: AuthRequest, res: Response) => {
     }
 
     await user.save();
+
+    logger.audit('CRYPTO_SELL', req.user?.id || 'unknown', {
+      coinId, amount, price, totalEarnings,
+      newWalletBalance: user.wallet,
+    });
+
     res.json(user);
   } catch (error) {
-    console.error('Error selling crypto:', error);
-    res.status(500).json({ message: 'Error al procesar la venta' });
+    logger.error('Error selling crypto', { error: (error as any).message, coinId });
+    next(error);
   }
 };
