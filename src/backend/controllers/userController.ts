@@ -215,3 +215,47 @@ export const sellCrypto = async (req: AuthRequest, res: Response, next: NextFunc
     next(error);
   }
 };
+
+/**
+ * POST /api/users/alerts
+ * Adds a new price alert
+ */
+export const addAlert = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const { coinId, symbol, condition, targetPrice } = req.body;
+  try {
+    const user = await User.findById(req.user?.id);
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    user.alerts.push({
+      id: Math.random().toString(36).substring(7),
+      coinId,
+      symbol,
+      condition,
+      targetPrice,
+      active: true
+    });
+
+    await user.save();
+    res.json(user.alerts);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /api/users/alerts/:id
+ * Removes a price alert
+ */
+export const removeAlert = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const { id } = req.params;
+  try {
+    const user = await User.findById(req.user?.id);
+    if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
+
+    user.alerts = user.alerts.filter(a => a.id !== id);
+    await user.save();
+    res.json(user.alerts);
+  } catch (error) {
+    next(error);
+  }
+};

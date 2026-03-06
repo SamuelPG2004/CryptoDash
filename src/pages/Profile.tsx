@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext.tsx';
 import api from '../services/api.ts';
-import { User, Mail, Globe, Calendar, Phone, Shield, Edit3, Lock, AlertCircle, CheckCircle2, X, Wallet, TrendingUp } from 'lucide-react';
+import { User, Mail, Globe, Calendar, Phone, Shield, Edit3, Lock, AlertCircle, CheckCircle2, X, Wallet, TrendingUp, Bell, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { COUNTRIES } from '../constants.ts';
 
@@ -59,6 +59,15 @@ const Profile: React.FC = () => {
       setError(err.response?.data?.message || 'Action failed');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const removeAlert = async (alertId: string) => {
+    try {
+      const { data } = await api.delete(`/users/alerts/${alertId}`);
+      setProfile({ ...profile, alerts: data });
+    } catch (err) {
+      console.error('Error removing alert', err);
     }
   };
 
@@ -180,6 +189,33 @@ const Profile: React.FC = () => {
             >
               <Lock size={18} /> Cambiar Contraseña
             </button>
+          </div>
+        </div>
+
+        {/* Alerts Section */}
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+          <h3 className="text-xl font-bold text-white flex items-center gap-3 uppercase tracking-tight mb-6">
+            <Bell className="text-emerald-500" size={20} /> Mis Alertas de Precio
+          </h3>
+          <div className="space-y-3">
+            {profile.alerts && profile.alerts.length > 0 ? (
+              profile.alerts.map((alert: any) => (
+                <div key={alert.id} className="flex items-center justify-between bg-zinc-800/50 p-4 rounded-xl border border-zinc-700">
+                  <div className="flex items-center gap-4">
+                    <div className="font-bold text-white">{alert.symbol}</div>
+                    <div className="text-sm text-zinc-400">
+                      {alert.condition === 'above' ? 'Sube por encima de' : 'Cae por debajo de'}{' '}
+                      <span className="font-mono text-emerald-400">${alert.targetPrice}</span>
+                    </div>
+                  </div>
+                  <button onClick={() => removeAlert(alert.id)} className="text-zinc-500 hover:text-rose-500 transition-colors">
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              ))
+            ) : (
+              <div className="text-zinc-500 text-sm italic">No tienes alertas configuradas. Agrégalas desde la página principal.</div>
+            )}
           </div>
         </div>
 

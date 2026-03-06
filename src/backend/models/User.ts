@@ -18,6 +18,14 @@ export interface IUser extends Document {
     amount: number;
     averagePrice: number;
   }[];
+  alerts: {
+    id: string;
+    coinId: string;
+    symbol: string;
+    condition: 'above' | 'below';
+    targetPrice: number;
+    active: boolean;
+  }[];
   createdAt: Date;
   comparePassword: (password: string) => Promise<boolean>;
   comparePin: (pin: string) => Promise<boolean>;
@@ -73,6 +81,14 @@ const userSchema = new mongoose.Schema({
     symbol: { type: String, required: true },
     amount: { type: Number, required: true, default: 0 },
     averagePrice: { type: Number, required: true, default: 0 }
+  }],
+  alerts: [{
+    id: { type: String, required: true },
+    coinId: { type: String, required: true },
+    symbol: { type: String, required: true },
+    condition: { type: String, required: true, enum: ['above', 'below'] },
+    targetPrice: { type: Number, required: true },
+    active: { type: Boolean, default: true }
   }]
 }, {
   timestamps: true

@@ -7,6 +7,8 @@ import {
   updateProfile,
   buyCrypto,
   sellCrypto,
+  addAlert,
+  removeAlert
 } from '../controllers/userController.js';
 import { protect } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
@@ -32,5 +34,9 @@ router.put('/profile', protect, validate(updateProfileSchema), asyncHandler(upda
 // Trading routes — rate limited + validated
 router.post('/buy', protect, tradeLimiter, validate(buySchema), asyncHandler(buyCrypto));
 router.post('/sell', protect, tradeLimiter, validate(sellSchema), asyncHandler(sellCrypto));
+
+// Alerts routes
+router.post('/alerts', protect, asyncHandler(addAlert));
+router.delete('/alerts/:id', protect, asyncHandler(removeAlert));
 
 export default router;

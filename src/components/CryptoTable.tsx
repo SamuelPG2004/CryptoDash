@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Star, ArrowUpRight, ArrowDownRight, Search, TrendingUp } from 'lucide-react';
+import { Star, ArrowUpRight, ArrowDownRight, Search, TrendingUp, Bell } from 'lucide-react';
 import { useAuth } from '../context/AuthContext.tsx';
 import api from '../services/api.ts';
 import { clsx, type ClassValue } from 'clsx';
@@ -58,6 +58,29 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
       alert(`${type === 'buy' ? 'Compra' : 'Venta'} exitosa de ${amount} ${selectedCoin.symbol}`);
     } catch (err: any) {
       alert(err.response?.data?.message || 'Error en la operación');
+    }
+  };
+
+  const handleAlert = async () => {
+    if (!user) return alert('Debes iniciar sesión para crear alertas');
+    if (!selectedCoin) return;
+
+    const targetPrice = parseFloat(prompt(`¿Cúal es el precio objetivo para la alerta de ${selectedCoin.symbol}?`) || '0');
+    if (targetPrice <= 0 || isNaN(targetPrice)) return;
+
+    const condition = targetPrice > selectedCoin.current_price ? 'above' : 'below';
+
+    try {
+      const { data } = await api.post('/users/alerts', {
+        coinId: selectedCoin.id,
+        symbol: selectedCoin.symbol,
+        condition,
+        targetPrice
+      });
+      updateUser({ ...user, alerts: data } as any);
+      alert(`Alerta creada para ${selectedCoin.symbol} cuando baje/suba de $${targetPrice}`);
+    } catch (err) {
+      alert('Error creando alerta');
     }
   };
 
@@ -239,6 +262,13 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
                   className="bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all active:scale-95 flex items-center gap-2"
                 >
                   Vender
+                </button>
+                <button
+                  onClick={handleAlert}
+                  className="bg-zinc-800 hover:bg-zinc-700 text-amber-500 text-xs font-black uppercase tracking-widest px-4 py-3 rounded-xl transition-all active:scale-95 flex items-center justify-center border border-zinc-700 hover:border-amber-500/50"
+                  title="Crear Alerta de Precio"
+                >
+                  <Bell size={18} />
                 </button>
               </div>
             </div>
