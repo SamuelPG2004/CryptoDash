@@ -3,6 +3,7 @@ import CryptoTable from '../components/CryptoTable.tsx';
 import NewsPanel from '../components/NewsPanel.tsx';
 import { TrendingUp, Shield, Zap, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 
 const MarketTicker: React.FC = () => {
   const [prices, setPrices] = useState([
@@ -41,6 +42,8 @@ const MarketTicker: React.FC = () => {
 };
 
 const Home: React.FC = () => {
+  const { t } = useTranslation();
+
   return (
     <div className="min-h-screen bg-zinc-950">
       <MarketTicker />
@@ -56,16 +59,16 @@ const Home: React.FC = () => {
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-              <span className="font-bold tracking-widest uppercase text-[10px]">Mercado en Vivo</span>
+              <span className="font-bold tracking-widest uppercase text-[10px]">{t('marketTicker')}</span>
             </div>
 
             <h1 className="text-5xl sm:text-8xl font-black text-white tracking-tighter mb-8 leading-[0.9] max-w-4xl mx-auto uppercase">
-              DOMINA EL <span className="bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(16,185,129,0.3)]">MERCADO</span> <br />
-              <span className="text-zinc-600 italic font-light lowercase">digital.</span>
+              {t('heroTitle1')} <span className="bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(16,185,129,0.3)]">{t('heroTitle2')}</span> <br />
+              <span className="text-zinc-600 italic font-light lowercase">{t('heroTitle3')}</span>
             </h1>
 
             <p className="text-zinc-400 text-lg sm:text-xl max-w-2xl mx-auto mb-10 font-medium">
-              Datos precisos, noticias al instante y análisis técnico avanzado para potenciar tus inversiones en criptoactivos.
+              {t('heroDesc')}
             </p>
 
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
@@ -73,13 +76,13 @@ const Home: React.FC = () => {
                 to="/register"
                 className="group bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-10 py-4 rounded-2xl transition-all duration-300 shadow-2xl shadow-emerald-500/20 flex items-center gap-3 active:scale-95"
               >
-                Crear Cuenta <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                {t('createAccount')} <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
               </Link>
               <Link
                 to="/login"
                 className="text-zinc-400 hover:text-white font-bold px-10 py-4 transition-colors"
               >
-                Ver Mercados
+                {t('viewMarkets')}
               </Link>
             </div>
           </header>
@@ -89,8 +92,8 @@ const Home: React.FC = () => {
             <div className="lg:col-span-2 space-y-8">
               <div className="flex items-end justify-between">
                 <div>
-                  <h2 className="text-3xl font-black text-white tracking-tight">Activos Líderes</h2>
-                  <p className="text-zinc-500 text-sm mt-1">Sincronización global en tiempo real</p>
+                  <h2 className="text-3xl font-black text-white tracking-tight">{t('leadingAssets')}</h2>
+                  <p className="text-zinc-500 text-sm mt-1">{t('leadingAssetsDesc')}</p>
                 </div>
                 <div className="hidden sm:flex items-center gap-2 bg-zinc-900 px-4 py-2 rounded-xl border border-zinc-800">
                   <TrendingUp size={16} className="text-emerald-500" />
