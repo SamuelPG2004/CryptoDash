@@ -11,47 +11,31 @@ interface NewsItem {
 }
 
 const NewsPanel: React.FC = () => {
-    const [news, setNews] = useState<NewsItem[]>([
-        {
-            id: '1',
-            title: 'Bitcoin rompe la barrera de los $65,000 en medio de optimismo institucional',
-            source: 'CryptoNews',
-            url: '#',
-            time: 'hace 5 min',
-            sentiment: 'bullish'
-        },
-        {
-            id: '2',
-            title: 'Ethereum anuncia actualización en la red de pruebas para mejorar la escalabilidad',
-            source: 'BlockDaily',
-            url: '#',
-            time: 'hace 15 min',
-            sentiment: 'neutral'
-        },
-        {
-            id: '3',
-            title: 'Reguladores advierten sobre nuevos protocolos DeFi sin auditoría',
-            source: 'FinanceWatch',
-            url: '#',
-            time: 'hace 45 min',
-            sentiment: 'bearish'
-        },
-        {
-            id: '4',
-            title: 'Solana alcanza un nuevo máximo anual mientras el ecosistema NFT florece',
-            source: 'ChainTalk',
-            url: '#',
-            time: 'hace 1 hora',
-            sentiment: 'bullish'
-        }
-    ]);
+    const [news, setNews] = useState<NewsItem[]>([]);
+    const [loading, setLoading] = useState(true);
 
-    // Simulado de "noticias en vivo" - rotación o actualización
     useEffect(() => {
-        const interval = setInterval(() => {
-            // Solo un efecto visual de actualización
-            setNews(prev => [...prev].sort(() => Math.random() - 0.5));
-        }, 15000);
+        const fetchNews = async () => {
+            try {
+                // To avoid causing dependency cycles, using fetch or api instance
+                const token = localStorage.getItem('token');
+                const headers: any = {};
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const response = await fetch('/api/news/feed', { headers });
+                if (response.ok) {
+                    const data = await response.json();
+                    setNews(data);
+                }
+            } catch (error) {
+                console.error("Error fetching news:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchNews();
+        const interval = setInterval(fetchNews, 5 * 60 * 1000); // refresh every 5 mins
         return () => clearInterval(interval);
     }, []);
 
@@ -71,10 +55,15 @@ const NewsPanel: React.FC = () => {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-                {news.map((item) => (
-                    <div
+                {loading ? (
+                    <div className="text-center text-zinc-500 text-sm mt-10 animate-pulse">Cargando noticias reales...</div>
+                ) : news.map((item) => (
+                    <a
+                        href={item.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         key={item.id}
-                        className="group p-4 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800/50 hover:border-emerald-500/30 rounded-2xl transition-all duration-300 cursor-pointer"
+                        className="group block p-4 bg-zinc-900/40 hover:bg-zinc-900 border border-zinc-800/50 hover:border-emerald-500/30 rounded-2xl transition-all duration-300 cursor-pointer"
                     >
                         <div className="flex items-start justify-between mb-2">
                             <span className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-1">
@@ -103,7 +92,7 @@ const NewsPanel: React.FC = () => {
                             <span className="text-xs text-emerald-500 font-medium">{item.source}</span>
                             <ExternalLink size={14} className="text-zinc-600 group-hover:text-emerald-500 transition-colors" />
                         </div>
-                    </div>
+                    </a>
                 ))}
             </div>
 

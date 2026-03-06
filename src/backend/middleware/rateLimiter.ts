@@ -16,6 +16,16 @@ export const authLimiter = rateLimit({
     },
     standardHeaders: true,
     legacyHeaders: false,
+    keyGenerator: (req) => {
+        // Soporte para Vercel/proxies: usa X-Forwarded-For si existe
+        const xfwd = req.headers['x-forwarded-for'];
+        if (typeof xfwd === 'string') {
+            return xfwd.split(',')[0].trim();
+        } else if (Array.isArray(xfwd)) {
+            return xfwd[0].trim();
+        }
+        return req.ip;
+    },
 });
 
 /**
