@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CryptoTable from '../components/CryptoTable.tsx';
 import NewsPanel from '../components/NewsPanel.tsx';
+import Converter from '../components/Converter.tsx';
 import { TrendingUp, Shield, Zap, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
@@ -109,6 +110,7 @@ const Home: React.FC = () => {
             {/* Sidebar News */}
             <div className="space-y-8">
               <NewsPanel />
+              <Converter />
 
               {/* Feature Cards in Sidebar */}
               <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 p-8 rounded-3xl text-white shadow-2xl shadow-emerald-900/20 relative overflow-hidden group">
