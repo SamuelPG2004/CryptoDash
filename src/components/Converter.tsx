@@ -71,7 +71,7 @@ const Converter: React.FC = () => {
     const isUp = change >= 0;
 
     return (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl w-full max-w-xs mx-auto flex flex-col">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl shadow-xl w-full flex flex-col mb-8">
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800">
                 <span className="text-lg font-black text-white tracking-tight">Conversor</span>
