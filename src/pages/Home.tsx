@@ -88,6 +88,10 @@ const Home: React.FC = () => {
             </div>
           </header>
 
+          {/* Sección exclusiva para el Conversor */}
+          <div className="max-w-lg mx-auto mb-12 mt-10">
+            <Converter />
+          </div>
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-20">
             {/* Main Content: Table & Charts */}
             <div className="lg:col-span-2 space-y-8">
