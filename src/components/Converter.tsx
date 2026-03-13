@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ArrowLeftRight, Calculator, RefreshCw, TrendingUp } from 'lucide-react';
+import { ArrowLeftRight, RefreshCw } from 'lucide-react';
 import api from '../services/api.ts';
 
 interface Crypto {
@@ -20,12 +20,10 @@ const Converter: React.FC = () => {
     const [direction, setDirection] = useState<Direction>('crypto-to-usdt');
     const [loading, setLoading] = useState<boolean>(true);
     const [refreshing, setRefreshing] = useState<boolean>(false);
-    const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
     const fetchPrices = useCallback(async (isRefresh = false) => {
         if (isRefresh) setRefreshing(true);
         else setLoading(true);
-
         try {
             const { data } = await api.get('/crypto/prices');
             const list: Crypto[] = data.slice(0, 30).map((c: any) => ({
@@ -37,179 +35,151 @@ const Converter: React.FC = () => {
                 change: c.change,
             }));
             setCryptos(list);
-            if (list.length > 0 && !selectedCrypto) {
-                setSelectedCrypto(list[0].id);
-            }
-            setLastUpdated(new Date());
+            if (list.length > 0 && !selectedCrypto) setSelectedCrypto(list[0].id);
         } catch (err) {
-            console.error('Error fetching prices for converter', err);
+            console.error('Converter fetch error', err);
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
     }, [selectedCrypto]);
 
-    useEffect(() => {
-        fetchPrices();
-    }, []);
+    useEffect(() => { fetchPrices(); }, []);
 
     const selectedCryptoData = cryptos.find(c => c.id === selectedCrypto);
     const cryptoPrice = selectedCryptoData?.price || 0;
     const numericAmount = parseFloat(amount) || 0;
 
-    // Core conversion logic: crypto <-> USDT (USDT ≈ USD pegged 1:1)
-    const convertedValue =
-        direction === 'crypto-to-usdt'
-            ? numericAmount * cryptoPrice          // X crypto → Y USDT
-            : numericAmount / (cryptoPrice || 1);  // X USDT → Y crypto
+    const convertedValue = direction === 'crypto-to-usdt'
+        ? numericAmount * cryptoPrice
+        : numericAmount / (cryptoPrice || 1);
 
-    const formatResult = (value: number): string => {
-        if (value === 0) return '0.00';
-        if (value >= 1) {
-            return value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 });
-        }
-        // For very small values (like DOGE/SHIB amounts)
-        return value.toLocaleString(undefined, { minimumFractionDigits: 6, maximumFractionDigits: 10 });
+    const fmt = (v: number) => {
+        if (v === 0) return '0.00';
+        if (v >= 1) return v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+        return v.toLocaleString(undefined, { minimumFractionDigits: 4, maximumFractionDigits: 8 });
     };
 
     const handleSwap = () => {
         setDirection(prev => prev === 'crypto-to-usdt' ? 'usdt-to-crypto' : 'crypto-to-usdt');
-        // Swap the converted value into the input so the user sees a smooth swap
-        setAmount(formatResult(convertedValue).replace(/,/g, ''));
+        setAmount(fmt(convertedValue).replace(/,/g, ''));
     };
 
-    const fromLabel = direction === 'crypto-to-usdt'
-        ? selectedCryptoData?.symbol ?? '...'
-        : 'USDT';
-    const toLabel = direction === 'crypto-to-usdt'
-        ? 'USDT'
-        : selectedCryptoData?.symbol ?? '...';
-
-    const changeColor = (selectedCryptoData?.change ?? 0) >= 0 ? 'text-emerald-400' : 'text-rose-400';
-    const changeBg = (selectedCryptoData?.change ?? 0) >= 0 ? 'bg-emerald-500/10' : 'bg-rose-500/10';
+    const fromSymbol = direction === 'crypto-to-usdt' ? (selectedCryptoData?.symbol ?? '—') : 'USDT';
+    const toSymbol = direction === 'crypto-to-usdt' ? 'USDT' : (selectedCryptoData?.symbol ?? '—');
+    const change = selectedCryptoData?.change ?? 0;
+    const isUp = change >= 0;
 
     return (
-        <div className="bg-zinc-950 border border-zinc-800 rounded-3xl overflow-hidden shadow-2xl">
-            {/* Header */}
-            <div className="p-5 border-b border-zinc-800 bg-zinc-900/20 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <div className="p-2 bg-blue-500/10 rounded-xl">
-                        <Calculator className="text-blue-400" size={18} />
-                    </div>
-                    <div>
-                        <h2 className="text-base font-bold text-white tracking-tight leading-none">Conversor</h2>
-                        <p className="text-[10px] text-zinc-500 mt-0.5 font-medium uppercase tracking-widest">Crypto ↔ USDT</p>
-                    </div>
-                </div>
+        <div className="bg-zinc-950 border border-zinc-800 rounded-2xl overflow-hidden shadow-xl">
 
+            {/* ── Header ─────────────────────────────────────── */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-zinc-800/70">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-black text-white tracking-tight">Conversor</span>
+                    <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest">Crypto ↔ USDT</span>
+                </div>
                 <button
                     onClick={() => fetchPrices(true)}
                     disabled={refreshing}
-                    className="p-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-all active:scale-95 disabled:opacity-50"
-                    title="Actualizar precios"
+                    className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-500 hover:text-white transition-all active:scale-95 disabled:opacity-40"
                 >
-                    <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+                    <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
                 </button>
             </div>
 
-            <div className="p-5 flex flex-col gap-4">
-                {/* Crypto Selector */}
+            <div className="p-4 space-y-3">
+
+                {/* ── Crypto Selector + live price ───────────── */}
                 <div>
-                    <label className="block text-[10px] font-black uppercase text-zinc-500 mb-2 tracking-widest">
-                        Criptomoneda
-                    </label>
                     {loading ? (
-                        <div className="h-12 bg-zinc-800/60 rounded-xl animate-pulse" />
+                        <div className="h-9 bg-zinc-800/60 rounded-lg animate-pulse" />
                     ) : (
                         <select
                             value={selectedCrypto}
                             onChange={e => setSelectedCrypto(e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-blue-500 transition-colors text-sm font-bold"
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-white text-xs font-bold focus:outline-none focus:border-blue-500 transition-colors"
                         >
                             {cryptos.map(c => (
-                                <option key={c.id} value={c.id}>
-                                    {c.symbol} — {c.name}
-                                </option>
+                                <option key={c.id} value={c.id}>{c.symbol} — {c.name}</option>
                             ))}
                         </select>
                     )}
 
-                    {/* Live price badge */}
-                    {selectedCryptoData && (
-                        <div className="flex items-center gap-2 mt-2">
-                            <TrendingUp size={11} className={changeColor} />
+                    {/* Live price strip */}
+                    {selectedCryptoData && !loading && (
+                        <div className="flex items-center gap-1.5 mt-1.5 px-1">
                             <span className="text-[11px] text-zinc-500 font-mono">
-                                1 {selectedCryptoData.symbol} =&nbsp;
+                                1 <span className="text-zinc-300 font-bold">{selectedCryptoData.symbol}</span>
+                                {' = '}
                                 <span className="text-white font-bold">
-                                    ${cryptoPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 6 })}
+                                    ${cryptoPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
                                 </span>
-                                &nbsp;USDT
                             </span>
-                            <span className={`text-[10px] font-black px-1.5 py-0.5 rounded-md ${changeBg} ${changeColor}`}>
-                                {(selectedCryptoData.change ?? 0) >= 0 ? '+' : ''}{(selectedCryptoData.change ?? 0).toFixed(2)}%
+                            <span className={`text-[10px] font-black px-1 py-0.5 rounded ${isUp ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                {isUp ? '+' : ''}{change.toFixed(2)}%
                             </span>
                         </div>
                     )}
                 </div>
 
-                {/* FROM Field */}
-                <div>
-                    <label className="block text-[10px] font-black uppercase text-zinc-500 mb-2 tracking-widest">
-                        De — <span className="text-blue-400">{fromLabel}</span>
-                    </label>
-                    <div className="relative">
-                        <input
-                            type="number"
-                            min="0"
-                            value={amount}
-                            onChange={e => setAmount(e.target.value)}
-                            className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 pr-20 text-white text-lg font-mono font-bold focus:outline-none focus:border-blue-500 transition-colors"
-                            placeholder="0.00"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-black text-zinc-500 uppercase tracking-widest pointer-events-none">
-                            {fromLabel}
-                        </span>
-                    </div>
-                </div>
+                {/* ── From / Swap / To row ────────────────────── */}
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
 
-                {/* Swap Button */}
-                <div className="flex justify-center">
+                    {/* FROM */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest px-1">
+                            De · <span className="text-blue-400">{fromSymbol}</span>
+                        </label>
+                        <div className="relative">
+                            <input
+                                type="number"
+                                min="0"
+                                value={amount}
+                                onChange={e => setAmount(e.target.value)}
+                                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2.5 text-white text-sm font-mono font-bold focus:outline-none focus:border-blue-500 transition-colors"
+                                placeholder="0.00"
+                            />
+                        </div>
+                    </div>
+
+                    {/* SWAP btn */}
                     <button
                         onClick={handleSwap}
-                        className="group bg-zinc-800 hover:bg-blue-500/20 border border-zinc-700 hover:border-blue-500/50 p-3 rounded-2xl text-zinc-400 hover:text-blue-400 transition-all duration-200 active:scale-95 shadow-lg"
-                        title="Invertir dirección"
+                        className="group mt-4 bg-zinc-800 hover:bg-blue-500/20 border border-zinc-700 hover:border-blue-500/50 p-2 rounded-xl text-zinc-500 hover:text-blue-400 transition-all active:scale-90"
                     >
-                        <ArrowLeftRight size={16} className="rotate-90 group-hover:rotate-[-90deg] transition-transform duration-300" />
+                        <ArrowLeftRight size={14} className="rotate-0 group-hover:rotate-180 transition-transform duration-300" />
                     </button>
-                </div>
 
-                {/* TO Field (result) */}
-                <div>
-                    <label className="block text-[10px] font-black uppercase text-zinc-500 mb-2 tracking-widest">
-                        A — <span className="text-emerald-400">{toLabel}</span>
-                    </label>
-                    <div className="relative">
-                        <div className="w-full bg-zinc-900/50 border border-zinc-800 rounded-xl px-4 py-3 pr-20 flex items-center min-h-[52px]">
+                    {/* TO */}
+                    <div className="flex flex-col gap-1">
+                        <label className="text-[9px] font-black uppercase text-zinc-600 tracking-widest px-1">
+                            A · <span className="text-emerald-400">{toSymbol}</span>
+                        </label>
+                        <div className="w-full bg-zinc-900/40 border border-zinc-800 rounded-lg px-3 py-2.5 min-h-[42px] flex items-center">
                             {loading ? (
-                                <div className="h-5 w-32 bg-zinc-700 rounded animate-pulse" />
+                                <div className="h-4 w-20 bg-zinc-700 rounded animate-pulse" />
                             ) : (
-                                <span className="text-lg font-mono font-bold text-emerald-300">
-                                    {formatResult(convertedValue)}
+                                <span className="text-sm font-mono font-bold text-emerald-300 truncate">
+                                    {fmt(convertedValue)}
                                 </span>
                             )}
                         </div>
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[11px] font-black text-zinc-500 uppercase tracking-widest pointer-events-none">
-                            {toLabel}
-                        </span>
                     </div>
                 </div>
 
-                {/* Last updated */}
-                {lastUpdated && (
-                    <p className="text-center text-[10px] text-zinc-600 font-medium">
-                        Precios actualizados: {lastUpdated.toLocaleTimeString()}
-                    </p>
+                {/* ── Rate summary ────────────────────────────── */}
+                {selectedCryptoData && !loading && (
+                    <div className="flex items-center justify-center gap-1 py-1 px-3 rounded-lg bg-zinc-900/50 border border-zinc-800/50">
+                        <span className="text-[10px] text-zinc-600 font-mono">
+                            {numericAmount || 1} <span className="text-zinc-400 font-bold">{fromSymbol}</span>
+                            {' ≈ '}
+                            <span className="text-emerald-400 font-bold">{fmt(convertedValue)}</span>
+                            {' '}{toSymbol}
+                        </span>
+                    </div>
                 )}
+
             </div>
         </div>
     );
