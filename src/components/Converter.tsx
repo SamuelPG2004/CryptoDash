@@ -1,38 +1,55 @@
 
-import React, { useState } from 'react';
-import { RefreshCw } from 'lucide-react';
 
-const COINS = [
-    { symbol: 'BTC', name: 'Bitcoin' },
-    { symbol: 'ETH', name: 'Ethereum' },
-    { symbol: 'USDT', name: 'Tether' },
-];
+import React, { useState, useEffect } from 'react';
+import { RefreshCw } from 'lucide-react';
+import api from '../services/api';
+
+interface Coin {
+    id: string;
+    symbol: string;
+    name: string;
+    price: number;
+}
 
 const Converter: React.FC = () => {
+    const [coins, setCoins] = useState<Coin[]>([]);
     const [fromAmount, setFromAmount] = useState('');
     const [toAmount, setToAmount] = useState('');
     const [fromCoin, setFromCoin] = useState('BTC');
     const [toCoin, setToCoin] = useState('USDT');
     const [refreshing, setRefreshing] = useState(false);
 
-    // Simulación de conversión simple
-    const handleConvert = () => {
-        // Ejemplo: 1 BTC = 65000 USDT, 1 ETH = 3500 USDT
-        let rate = 1;
-        if (fromCoin === 'BTC' && toCoin === 'USDT') rate = 65000;
-        else if (fromCoin === 'ETH' && toCoin === 'USDT') rate = 3500;
-        else if (fromCoin === 'USDT' && toCoin === 'BTC') rate = 1 / 65000;
-        else if (fromCoin === 'USDT' && toCoin === 'ETH') rate = 1 / 3500;
-        else if (fromCoin === 'BTC' && toCoin === 'ETH') rate = 65000 / 3500;
-        else if (fromCoin === 'ETH' && toCoin === 'BTC') rate = 3500 / 65000;
-        else rate = 1;
-        const result = parseFloat(fromAmount) * rate;
-        setToAmount(isNaN(result) ? '' : result.toString());
+    useEffect(() => {
+        fetchCoins();
+    }, []);
+
+    const fetchCoins = async () => {
+        setRefreshing(true);
+        try {
+            const { data } = await api.get('/crypto/prices');
+            setCoins(data.map((c: any) => ({
+                id: c.id,
+                symbol: c.symbol,
+                name: c.name,
+                price: c.price,
+            })));
+        } catch (err) {
+            setCoins([]);
+        } finally {
+            setRefreshing(false);
+        }
     };
 
-    const handleRefresh = () => {
-        setRefreshing(true);
-        setTimeout(() => setRefreshing(false), 800);
+    const handleConvert = () => {
+        const from = coins.find(c => c.symbol === fromCoin);
+        const to = coins.find(c => c.symbol === toCoin);
+        if (!from || !to) {
+            setToAmount('');
+            return;
+        }
+        // Conversion: fromAmount * (from.price / to.price)
+        const result = parseFloat(fromAmount) * (from.price / to.price);
+        setToAmount(isNaN(result) ? '' : result.toString());
     };
 
     return (
@@ -41,7 +58,7 @@ const Converter: React.FC = () => {
             <div className="flex justify-between items-center mb-4">
                 <span className="text-lg font-black text-white">Conversor</span>
                 <button
-                    onClick={handleRefresh}
+                    onClick={fetchCoins}
                     disabled={refreshing}
                     className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-gray-100 transition-all active:scale-95 disabled:opacity-40 flex items-center"
                     aria-label="Actualizar"
@@ -66,7 +83,7 @@ const Converter: React.FC = () => {
                         onChange={e => setFromCoin(e.target.value)}
                         className="bg-black text-gray-200 rounded-lg px-2 py-2 text-sm outline-none"
                     >
-                        {COINS.map(c => (
+                        {coins.map(c => (
                             <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
                         ))}
                     </select>
@@ -89,7 +106,7 @@ const Converter: React.FC = () => {
                         onChange={e => setToCoin(e.target.value)}
                         className="bg-black text-gray-200 rounded-lg px-2 py-2 text-sm outline-none"
                     >
-                        {COINS.map(c => (
+                        {coins.map(c => (
                             <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
                         ))}
                     </select>
