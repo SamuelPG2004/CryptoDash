@@ -108,7 +108,7 @@ const Home: React.FC = () => {
             </div>
 
             {/* Sidebar News */}
-            <div className="space-y-8">
+            <div className="space-y-8 pb-12 pt-4">
               <NewsPanel />
               <Converter />
 
