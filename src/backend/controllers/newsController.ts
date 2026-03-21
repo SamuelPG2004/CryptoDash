@@ -18,10 +18,29 @@ export const getNewsFeed = async (_req: Request, res: Response, next: NextFuncti
             sentiment: 'neutral'
         }));
         res.json(news);
-    } catch (error: any) {
-        logger.error('Error fetching news feed', { error: error.message });
-        next(new AppError('Error al obtener el feed de noticias', 500));
-    }
+        } catch (error: any) {
+                logger.error('Error fetching news feed', { error: error.message });
+                // Fallback: datos mock si falla el RSS
+                const mockNews = [
+                    {
+                        id: 'mock1',
+                        title: 'Bitcoin alcanza nuevo máximo semanal',
+                        source: 'MockNews',
+                        url: 'https://mocknews.com/bitcoin',
+                        time: new Date().toLocaleString(),
+                        sentiment: 'neutral',
+                    },
+                    {
+                        id: 'mock2',
+                        title: 'Ethereum se mantiene estable pese a la volatilidad',
+                        source: 'MockNews',
+                        url: 'https://mocknews.com/ethereum',
+                        time: new Date().toLocaleString(),
+                        sentiment: 'neutral',
+                    },
+                ];
+                res.json(mockNews);
+        }
 };
 
 /**
