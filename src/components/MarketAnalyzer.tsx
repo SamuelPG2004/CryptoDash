@@ -1,29 +1,49 @@
+
 import React, { useState } from 'react';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-const API_KEY = 'AIzaSyBuERZIEzF_suFj-XYTAzSBPDP_IOARezU';
 const MODEL = 'gemini-2.5-flash';
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+interface MarketData {
+  symbol: string;
+  price: string;
+  volume: string;
+  change24h: string;
+}
 
-function getSentimentColor(sentiment) {
+interface AnalysisResult {
+  raw: string;
+  sentiment: 'ALCISTA' | 'BAJISTA' | 'NEUTRAL';
+  soporte: string;
+  resistencia: string;
+  justificacion: string;
+}
+
+function getSentimentColor(sentiment: string) {
   if (sentiment === 'ALCISTA') return 'text-green-500 border-green-500';
   if (sentiment === 'BAJISTA') return 'text-red-500 border-red-500';
   return 'text-yellow-400 border-yellow-400';
 }
 
+const apiKey = process.env.REACT_APP_GEMINI_KEY;
+
 export default function MarketAnalyzer() {
-  const [data, setData] = useState({ symbol: '', price: '', volume: '', change24h: '' });
-  const [result, setResult] = useState(null);
+  const [data, setData] = useState<MarketData>({ symbol: '', price: '', volume: '', change24h: '' });
+  const [result, setResult] = useState<AnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function getMarketAnalysis(data) {
+  async function getMarketAnalysis(data: MarketData) {
+    if (!apiKey) {
+      setError('No se ha configurado la API KEY de Gemini.');
+      return;
+    }
     const prompt = `Eres un experto en trading deportivo y cripto. Analiza estos datos de mercado: ${JSON.stringify(data)}. Dame un veredicto de sentimiento (ALCISTA/BAJISTA/NEUTRAL), un punto de Soporte, uno de Resistencia y una breve justificación técnica de 2 frases.`;
     try {
       setLoading(true);
       setError('');
       setResult(null);
+      const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: MODEL });
       const res = await model.generateContent(prompt);
       const text = res.response.text();
@@ -34,7 +54,7 @@ export default function MarketAnalyzer() {
       const justMatch = text.match(/justificaci[oó]n\s*[:\-]?\s*(.+)/i);
       setResult({
         raw: text,
-        sentiment: sentimentMatch ? sentimentMatch[1].toUpperCase() : 'NEUTRAL',
+        sentiment: sentimentMatch ? (sentimentMatch[1].toUpperCase() as AnalysisResult['sentiment']) : 'NEUTRAL',
         soporte: soporteMatch ? soporteMatch[1] : '-',
         resistencia: resistenciaMatch ? resistenciaMatch[1] : '-',
         justificacion: justMatch ? justMatch[1] : text
