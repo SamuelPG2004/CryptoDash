@@ -60,8 +60,9 @@ const Converter: React.FC = () => {
                 <button
                     onClick={fetchCoins}
                     disabled={refreshing}
-                    className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-gray-100 transition-all active:scale-95 disabled:opacity-40 flex items-center"
+                    className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-gray-100 transition-all active:scale-95 disabled:opacity-40 flex items-center focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     aria-label="Actualizar"
+                    tabIndex={0}
                 >
                     <RefreshCw size={18} className={refreshing ? 'animate-spin' : ''} />
                 </button>

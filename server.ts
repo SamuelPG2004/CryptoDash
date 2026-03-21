@@ -1,3 +1,11 @@
+// Suscribir usuarios autenticados a su canal privado
+io.on('connection', (socket) => {
+  socket.on('auth', (userId: string) => {
+    if (userId) {
+      socket.join(userId);
+    }
+  });
+});
 import express from 'express';
 import helmet from 'helmet';
 import { env, validateEnv } from './src/backend/config/env.js';
@@ -8,11 +16,24 @@ import authRoutes from './src/backend/routes/authRoutes.js';
 import userRoutes from './src/backend/routes/userRoutes.js';
 import cryptoRoutes from './src/backend/routes/cryptoRoutes.js';
 import newsRoutes from './src/backend/routes/newsRoutes.js';
+import transactionRoutes from './src/backend/routes/transactionRoutes.js';
+import { startAlertChecker } from './src/backend/services/alertChecker.js';
 
 // ─── Validate environment on startup ─────────────────────────────────────
 validateEnv();
 
+
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
+
 const app = express();
+const server = http.createServer(app);
+const io = new SocketIOServer(server, {
+  cors: { origin: '*' },
+});
+
+// Exponer io globalmente para usarlo en servicios/controladores
+app.set('io', io);
 
 // ─── Security middleware ──────────────────────────────────────────────────
 app.use(helmet({
@@ -28,6 +49,7 @@ app.use('/api', generalLimiter);
 // Auth and User routes require MongoDB connection (via requireDB middleware)
 app.use('/api/auth', requireDB, authRoutes);
 app.use('/api/users', requireDB, userRoutes);
+app.use('/api/transactions', requireDB, transactionRoutes);
 
 // Crypto prices do NOT need MongoDB — uses CoinGecko API with caching
 app.use('/api/crypto', cryptoRoutes);
@@ -61,9 +83,12 @@ if (!env.IS_VERCEL && env.NODE_ENV !== 'production') {
 }
 
 // ─── Start HTTP server (only when running directly, not on Vercel) ───────
+
 if (!env.IS_VERCEL) {
-  app.listen(env.PORT, '0.0.0.0', () => {
+  server.listen(env.PORT, '0.0.0.0', () => {
     console.log(`🚀 Server running on http://localhost:${env.PORT}`);
+    // Start alert checker only in persistent server mode (not Vercel serverless)
+    startAlertChecker(io);
   });
 }
 

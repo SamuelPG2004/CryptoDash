@@ -7,23 +7,46 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
 const MarketTicker: React.FC = () => {
-  const [prices, setPrices] = useState([
-    { symbol: 'BTC', price: '64,231.40', change: '+2.4%' },
-    { symbol: 'ETH', price: '3,452.12', change: '+1.8%' },
-    { symbol: 'SOL', price: '145.67', change: '-0.5%' },
-  ]);
+  const [prices, setPrices] = useState<{ symbol: string; price: number; change: number }[]>([]);
 
   useEffect(() => {
+    // Fetch real prices from the backend (which caches CoinGecko)
+    const loadPrices = async () => {
+      try {
+        const res = await fetch('/api/crypto/prices');
+        if (!res.ok) throw new Error('fetch failed');
+        const data = await res.json();
+        const top = data.slice(0, 6).map((c: any) => ({
+          symbol: c.symbol,
+          price: c.price ?? 0,
+          change: c.change ?? 0,
+        }));
+        setPrices(top);
+      } catch {
+        // Fallback if API is not available
+        setPrices([
+          { symbol: 'BTC', price: 64231, change: 2.4 },
+          { symbol: 'ETH', price: 3452, change: 1.8 },
+          { symbol: 'SOL', price: 145.67, change: -0.5 },
+        ]);
+      }
+    };
+
+    loadPrices();
+
+    // Simulate micro price drift every 3 seconds (within ±0.05% of real price)
     const interval = setInterval(() => {
-      setPrices(prev => prev.map(p => ({
-        ...p,
-        price: (parseFloat(p.price.replace(',', '')) + (Math.random() - 0.5) * 10).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      })));
+      setPrices(prev =>
+        prev.map(p => ({
+          ...p,
+          price: Math.max(0, p.price * (1 + (Math.random() - 0.5) * 0.001)),
+        }))
+      );
     }, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  const tickerItems = [...prices, ...prices, ...prices, ...prices, ...prices, ...prices];
+  const tickerItems = prices.length > 0 ? [...prices, ...prices, ...prices, ...prices] : [];
 
   return (
     <div className="bg-zinc-950/50 backdrop-blur-md border-b border-zinc-900 overflow-hidden py-3">
@@ -31,9 +54,11 @@ const MarketTicker: React.FC = () => {
         {tickerItems.map((item, i) => (
           <div key={i} className="flex items-center gap-3 px-10 border-r border-zinc-800/50 last:border-0">
             <span className="text-zinc-500 font-black text-[10px] tracking-widest">{item.symbol}</span>
-            <span className="text-white font-mono text-xs font-bold">${item.price}</span>
-            <span className={`text-[10px] font-black ${item.change.startsWith('+') ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {item.change}
+            <span className="text-white font-mono text-xs font-bold">
+              ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className={`text-[10px] font-black ${item.change >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {item.change >= 0 ? '+' : ''}{item.change.toFixed(2)}%
             </span>
           </div>
         ))}
@@ -114,7 +139,6 @@ const Home: React.FC = () => {
             {/* Sidebar News */}
             <div className="space-y-8 pb-12 pt-4">
               <NewsPanel />
-              <Converter />
 
               {/* Feature Cards in Sidebar */}
               <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 p-8 rounded-3xl text-white shadow-2xl shadow-emerald-900/20 relative overflow-hidden group">

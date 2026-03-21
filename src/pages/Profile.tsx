@@ -178,6 +178,8 @@ const Profile: React.FC = () => {
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl flex flex-col justify-center gap-4">
             <h3 className="text-zinc-500 text-xs font-bold uppercase tracking-widest mb-2">Acciones de Seguridad</h3>
             <button
+              tabIndex={0}
+              aria-label="Acciones de seguridad"
               onClick={() => { setModalType('edit'); setError(''); setSuccess(''); }}
               className="w-full bg-zinc-800 hover:bg-zinc-700 text-white font-medium py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-3 border border-zinc-700"
             >

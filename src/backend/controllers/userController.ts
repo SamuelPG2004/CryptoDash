@@ -1,6 +1,7 @@
 import { Response, NextFunction } from 'express';
 import { AuthRequest } from '../middleware/auth.js';
 import User from '../models/User.js';
+import Transaction from '../models/Transaction.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -134,7 +135,7 @@ export const toggleFavorite = async (req: AuthRequest, res: Response, next: Next
  * Input pre-validated by Zod (buySchema).
  */
 export const buyCrypto = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const { coinId, symbol, amount, price } = req.body;
+  const { coinId, symbol, name, amount, price } = req.body;
   try {
     const user = await User.findById(req.user?.id);
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -162,6 +163,30 @@ export const buyCrypto = async (req: AuthRequest, res: Response, next: NextFunct
 
     await user.save();
 
+    // ── Record transaction in history ─────────────────────────────────────
+
+    const transaction = await Transaction.create({
+      userId: user._id,
+      type: 'buy',
+      coinId,
+      symbol,
+      name: name || coinId,
+      amount,
+      price,
+      totalUSD: totalCost,
+    });
+
+    // Emitir notificación privada por socket.io
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(user._id.toString()).emit('transaction', {
+          type: 'buy',
+          transaction,
+        });
+      }
+    } catch {}
+
     logger.audit('CRYPTO_BUY', req.user?.id || 'unknown', {
       coinId, symbol, amount, price, totalCost,
       newWalletBalance: user.wallet,
@@ -180,7 +205,7 @@ export const buyCrypto = async (req: AuthRequest, res: Response, next: NextFunct
  * Input pre-validated by Zod (sellSchema).
  */
 export const sellCrypto = async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const { coinId, amount, price } = req.body;
+  const { coinId, symbol: reqSymbol, name, amount, price } = req.body;
   try {
     const user = await User.findById(req.user?.id);
     if (!user) return res.status(404).json({ message: 'Usuario no encontrado' });
@@ -189,6 +214,8 @@ export const sellCrypto = async (req: AuthRequest, res: Response, next: NextFunc
     if (itemIndex === -1 || user.portfolio[itemIndex].amount < amount) {
       return res.status(400).json({ message: 'No tienes suficientes activos para vender' });
     }
+
+    const symbol = reqSymbol || user.portfolio[itemIndex].symbol;
 
     // Update wallet
     const totalEarnings = amount * price;
@@ -204,8 +231,32 @@ export const sellCrypto = async (req: AuthRequest, res: Response, next: NextFunc
 
     await user.save();
 
+    // ── Record transaction in history ─────────────────────────────────────
+
+    const transaction = await Transaction.create({
+      userId: user._id,
+      type: 'sell',
+      coinId,
+      symbol,
+      name: name || coinId,
+      amount,
+      price,
+      totalUSD: totalEarnings,
+    });
+
+    // Emitir notificación privada por socket.io
+    try {
+      const io = req.app.get('io');
+      if (io) {
+        io.to(user._id.toString()).emit('transaction', {
+          type: 'sell',
+          transaction,
+        });
+      }
+    } catch {}
+
     logger.audit('CRYPTO_SELL', req.user?.id || 'unknown', {
-      coinId, amount, price, totalEarnings,
+      coinId, symbol, amount, price, totalEarnings,
       newWalletBalance: user.wallet,
     });
 

@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext.tsx';
 import api from '../services/api.ts';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import TradeModal from './TradeModal.tsx';
 import {
   LineChart,
   Line,
@@ -18,6 +19,25 @@ import {
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+// ─── Technical Indicator Utilities ───────────────────────────────────────
+function calculateSMA(prices: number[], period: number): number | null {
+  if (prices.length < period) return null;
+  const slice = prices.slice(-period);
+  return slice.reduce((a, b) => a + b, 0) / period;
+}
+
+function calculateRSI(prices: number[], period = 14): number | null {
+  if (prices.length < period + 1) return null;
+  const changes = prices.slice(-period - 1).map((v, i, a) => (i === 0 ? 0 : v - a[i - 1])).slice(1);
+  const gains = changes.filter(c => c > 0);
+  const losses = changes.filter(c => c < 0).map(Math.abs);
+  const avgGain = gains.reduce((a, b) => a + b, 0) / period;
+  const avgLoss = losses.reduce((a, b) => a + b, 0) / period;
+  if (avgLoss === 0) return 100;
+  const rs = avgGain / avgLoss;
+  return Math.round(100 - 100 / (1 + rs));
 }
 
 interface Crypto {
@@ -38,34 +58,35 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
   const [selectedCoinId, setSelectedCoinId] = useState<string | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [tradeModal, setTradeModal] = useState<{ open: boolean; type: 'buy' | 'sell' }>({ open: false, type: 'buy' });
   const { user, updateFavorites, updateUser } = useAuth();
 
   const handleTrade = async (type: 'buy' | 'sell') => {
     if (!user) return alert('Debes iniciar sesión para operar');
     if (!selectedCoin) return;
+    setTradeModal({ open: true, type });
+  };
 
-    const amount = parseFloat(prompt(`¿Cuánto ${selectedCoin.symbol} deseas ${type === 'buy' ? 'comprar' : 'vender'}?`) || '0');
-    if (amount <= 0 || isNaN(amount)) return;
-
-    try {
-      const { data } = await api.post(`/users/${type}`, {
-        coinId: selectedCoin.id,
-        symbol: selectedCoin.symbol,
-        amount,
-        price: selectedCoin.current_price
-      });
-      updateUser(data);
-      alert(`${type === 'buy' ? 'Compra' : 'Venta'} exitosa de ${amount} ${selectedCoin.symbol}`);
-    } catch (err: any) {
-      alert(err.response?.data?.message || 'Error en la operación');
-    }
+  const executeTrade = async (amount: number) => {
+    if (!selectedCoin) return;
+    const type = tradeModal.type;
+    const { data } = await api.post(`/users/${type}`, {
+      coinId: selectedCoin.id,
+      symbol: selectedCoin.symbol,
+      name: selectedCoin.name,
+      amount,
+      price: selectedCoin.current_price,
+    });
+    updateUser(data);
   };
 
   const handleAlert = async () => {
     if (!user) return alert('Debes iniciar sesión para crear alertas');
     if (!selectedCoin) return;
 
-    const targetPrice = parseFloat(prompt(`¿Cúal es el precio objetivo para la alerta de ${selectedCoin.symbol}?`) || '0');
+    const targetPriceStr = prompt(`¿Cuál es el precio objetivo para la alerta de ${selectedCoin.symbol}?\nPrecio actual: $${selectedCoin.current_price.toLocaleString()}`);
+    if (!targetPriceStr) return;
+    const targetPrice = parseFloat(targetPriceStr);
     if (targetPrice <= 0 || isNaN(targetPrice)) return;
 
     const condition = targetPrice > selectedCoin.current_price ? 'above' : 'below';
@@ -78,7 +99,6 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
         targetPrice
       });
       updateUser({ ...user, alerts: data } as any);
-      alert(`Alerta creada para ${selectedCoin.symbol} cuando baje/suba de $${targetPrice}`);
     } catch (err) {
       alert('Error creando alerta');
     }
@@ -178,6 +198,15 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
     }));
   }, [selectedCoin]);
 
+  // ─── Real technical indicators from sparkline data ────────────────────────
+  const indicators = useMemo(() => {
+    const prices = selectedCoin?.sparkline || [];
+    if (prices.length < 20) return null;
+    const sma = calculateSMA(prices, 20);
+    const rsi = calculateRSI(prices, 14);
+    return { sma, rsi };
+  }, [selectedCoin]);
+
   if (loading && cryptos.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-20 bg-zinc-950 rounded-xl border border-zinc-800 border-dashed">
@@ -199,6 +228,7 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
 
 
   return (
+    <>
     <div className="space-y-6">
       {/* Trend Chart Section */}
       {selectedCoin && (
@@ -211,7 +241,7 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
             <div className="flex items-center gap-5">
               <div className="relative">
                 <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full" />
-                <img src={selectedCoin.image} alt="" className="w-16 h-16 rounded-2xl relative border border-zinc-800 bg-zinc-900 p-2" />
+                <img src={selectedCoin.image} alt={selectedCoin.name} className="w-16 h-16 rounded-2xl relative border border-zinc-800 bg-zinc-900 p-2" />
               </div>
               <div>
                 <div className="flex items-center gap-2 mb-1">
@@ -352,10 +382,27 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
 
           <div className="mt-6 flex items-center justify-between text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em]">
             <span>Historial 7D</span>
-            <div className="flex gap-4">
-              <span className="text-emerald-500/50">MA(20): $62.4k</span>
-              <span className="text-rose-500/50">RSI: 58.2</span>
-            </div>
+            {indicators ? (
+              <div className="flex gap-4">
+                {indicators.sma !== null && (
+                  <span className="text-emerald-500/60">
+                    SMA(20): ${indicators.sma.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                  </span>
+                )}
+                {indicators.rsi !== null && (
+                  <span className={cn(
+                    indicators.rsi > 70 ? 'text-rose-500/60' :
+                    indicators.rsi < 30 ? 'text-emerald-500/60' :
+                    'text-zinc-500/60'
+                  )}>
+                    RSI(14): {indicators.rsi}
+                    {indicators.rsi > 70 ? ' • Sobrecomprado' : indicators.rsi < 30 ? ' • Sobrevendido' : ''}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span className="text-zinc-700">Datos insuficientes para indicadores</span>
+            )}
           </div>
         </div>
       )}
@@ -402,11 +449,11 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-700">
                         <img
-                          src={crypto.image}
-                          alt={crypto.name}
-                          className="w-full h-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
+                            src={crypto.image}
+                            alt={crypto.name}
+                            className="w-full h-full object-cover"
+                            referrerPolicy="no-referrer"
+                          />
                       </div>
                       <div>
                         <div className="font-bold text-white group-hover:text-emerald-400 transition-colors">{crypto.name}</div>
@@ -453,6 +500,22 @@ const CryptoTable: React.FC<{ filterFavorites?: boolean }> = ({ filterFavorites 
         </div>
       </div>
     </div>
+
+    {/* Trade Modal — replaces native prompt() */}
+    {selectedCoin && (
+      <TradeModal
+        isOpen={tradeModal.open}
+        type={tradeModal.type}
+        coin={selectedCoin}
+        walletBalance={user?.wallet ?? 0}
+        ownedAmount={
+          user?.portfolio?.find((p: any) => p.coinId === selectedCoin.id)?.amount ?? 0
+        }
+        onConfirm={executeTrade}
+        onClose={() => setTradeModal(m => ({ ...m, open: false }))}
+      />
+    )}
+    </>
   );
 };
 
