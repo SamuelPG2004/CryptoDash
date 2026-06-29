@@ -1,17 +1,11 @@
 import express from 'express';
-import axios from 'axios';
 import { logger } from '../utils/logger.js';
+import { getCachedPrices } from '../services/priceCache.js';
 
 const router = express.Router();
 
-// ─── Cache configuration ────────────────────────────────────────────────
-// 5-minute cache prevents CoinGecko rate limit (429).
-// In Vercel serverless, cache resets on cold starts but handles traffic bursts within warm instances.
-let cachedPrices: any = null;
-let lastFetchTime = 0;
-const CACHE_DURATION = 5 * 60 * 1000;
-
 // ─── Mock data fallback ─────────────────────────────────────────────────
+// Served only when CoinGecko is unreachable AND the shared cache is empty.
 const MOCK_DATA = [
   { id: 'bitcoin', symbol: 'BTC', name: 'Bitcoin', price: 64000, change: 1.2, image: 'https://assets.coingecko.com/coins/images/1/small/bitcoin.png', sparkline: Array.from({ length: 168 }, (_, i) => 64000 + Math.sin(i / 10) * 2000 + Math.random() * 500) },
   { id: 'ethereum', symbol: 'ETH', name: 'Ethereum', price: 3400, change: -0.5, image: 'https://assets.coingecko.com/coins/images/279/small/ethereum.png', sparkline: Array.from({ length: 168 }, (_, i) => 3400 + Math.sin(i / 8) * 150 + Math.random() * 50) },
@@ -26,51 +20,21 @@ const MOCK_DATA = [
 ];
 
 // ─── GET /api/crypto/prices ─────────────────────────────────────────────
+// Delegates to the shared priceCache so buy/sell operations and this endpoint
+// always read from the same cached data.
 router.get('/prices', async (_req, res) => {
-  const now = Date.now();
-
-  // Return cached data if fresh
-  if (cachedPrices && (now - lastFetchTime < CACHE_DURATION)) {
-    return res.json(cachedPrices);
-  }
-
   try {
-    const { data } = await axios.get(
-      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=true&price_change_percentage=24h',
-      {
-        timeout: 4500,
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'CryptoDash/1.0 (educational project)',
-        },
-      },
-    );
+    const prices = await getCachedPrices();
 
-    const formattedData = data
-      .filter((coin: any) => coin && coin.id && coin.symbol)
-      .map((coin: any) => ({
-        id: coin.id,
-        symbol: coin.symbol.toUpperCase(),
-        name: coin.name || coin.id,
-        price: coin.current_price || 0,
-        change: coin.price_change_percentage_24h || 0,
-        image: coin.image || '',
-        sparkline: coin.sparkline_in_7d?.price || [],
-      }));
-
-    cachedPrices = formattedData;
-    lastFetchTime = now;
-
-    res.json(formattedData);
-  } catch (error: any) {
-    logger.warn('CoinGecko fetch failed, using fallback', { error: error.message });
-
-    // Return stale cache before mock data
-    if (cachedPrices) {
-      return res.json(cachedPrices);
+    if (prices.length > 0) {
+      return res.json(prices);
     }
 
-    // Fallback: return mock data so the UI always shows something
+    // Cache empty after refresh attempt — return mock data so UI always shows something
+    logger.warn('CoinGecko unavailable and cache empty, returning mock data');
+    res.json(MOCK_DATA);
+  } catch (error: any) {
+    logger.warn('CoinGecko fetch failed, using mock fallback', { error: error.message });
     res.json(MOCK_DATA);
   }
 });

@@ -1,55 +1,44 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import { env } from '../config/env.js';
-import { logger } from '../utils/logger.js';
-
 /**
- * Dedicated service for Google Gemini AI interactions.
- * - Encapsulates ALL Gemini logic in one place.
- * - Uses lazy initialization (client created on first call).
- * - GEMINI_API_KEY is read ONLY from process.env, never exposed to the frontend.
+ * @fileoverview geminiService — Módulo de retrocompatibilidad.
+ *
+ * ⚠️  DEPRECADO: Este archivo existe únicamente para mantener compatibilidad
+ * con cualquier import legacy que pudiera existir en el codebase.
+ *
+ * MIGRACIÓN:
+ *  - Para uso en controladores → usa `AiProviderFactory.getProvider()` (inyección de dependencias)
+ *  - Para tipos compartidos   → importa desde `adapters/ai/IAiProvider.ts`
+ *  - Para llamadas directas   → instancia `GroqAdapter` directamente (casos de uso de testing)
+ *
+ * Este archivo será eliminado en la próxima versión mayor.
+ *
+ * @deprecated Usar AiProviderFactory en su lugar.
+ * @module services/geminiService
  */
 
-let genAI: GoogleGenerativeAI | null = null;
+export type {
+    CoinAnalysisInput,
+    MarketAnalysisInput,
+    MarketAnalysisOutput,
+} from '../adapters/ai/IAiProvider.js';
 
-function getClient(): GoogleGenerativeAI {
-    if (!genAI) {
-        if (!env.GEMINI_API_KEY) {
-            throw new Error('GEMINI_API_KEY no está configurada en las variables de entorno');
-        }
-        genAI = new GoogleGenerativeAI(env.GEMINI_API_KEY);
-    }
-    return genAI;
-}
+export { AiProviderFactory as default } from '../adapters/ai/AiProviderFactory.js';
 
-export interface CoinAnalysisInput {
-    coinName: string;
-    coinSymbol: string;
-    currentPrice: number;
-    change24h: number;
+/**
+ * @deprecated Usar `AiProviderFactory.getProvider().analyzeCoin()` en su lugar.
+ */
+export async function analyzeCoin(
+    input: import('../adapters/ai/IAiProvider.js').CoinAnalysisInput
+): Promise<string> {
+    const { AiProviderFactory } = await import('../adapters/ai/AiProviderFactory.js');
+    return AiProviderFactory.getProvider().analyzeCoin(input);
 }
 
 /**
- * Generates a brief market analysis for a given cryptocurrency using Gemini AI.
- * Returns a professional analysis in Spanish (max ~100 words).
+ * @deprecated Usar `AiProviderFactory.getProvider().analyzeMarketData()` en su lugar.
  */
-export async function analyzeCoin(input: CoinAnalysisInput): Promise<string> {
-    const client = getClient();
-    const model = client.getGenerativeModel({ model: 'gemini-2.0-flash' });
-
-    const prompt =
-        `Analiza el estado actual de ${input.coinName} (${input.coinSymbol}). ` +
-        `Precio actual: $${input.currentPrice}. Cambio en 24h: ${input.change24h}%. ` +
-        `Proporciona un análisis breve (máximo 100 palabras) sobre si es un buen momento para ` +
-        `comprar, vender o mantener, basándote en la tendencia. ` +
-        `Responde en un tono profesional y directo en español.`;
-
-    logger.info('Gemini analysis requested', { coin: input.coinSymbol, price: input.currentPrice });
-
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-
-    logger.info('Gemini analysis completed', { coin: input.coinSymbol, chars: text.length });
-
-    return text;
+export async function analyzeMarketData(
+    input: import('../adapters/ai/IAiProvider.js').MarketAnalysisInput
+): Promise<import('../adapters/ai/IAiProvider.js').MarketAnalysisOutput> {
+    const { AiProviderFactory } = await import('../adapters/ai/AiProviderFactory.js');
+    return AiProviderFactory.getProvider().analyzeMarketData(input);
 }

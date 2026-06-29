@@ -1,10 +1,19 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
+const isProd = process.env.NODE_ENV === 'production';
+
+// ─── Fatal guard: JWT_SECRET must be set in production ───────────────────────
+// If missing, the app boots with a known secret making ALL tokens forgeable.
+if (isProd && !process.env.JWT_SECRET) {
+    console.error('❌ FATAL: JWT_SECRET must be set in production. Exiting.');
+    process.exit(1);
+}
+
 export const env = {
     MONGODB_URI: process.env.MONGODB_URI || 'mongodb://localhost:27017/cryptodash',
-    JWT_SECRET: process.env.JWT_SECRET || 'fallback_secret_change_in_production',
-    GEMINI_API_KEY: process.env.GEMINI_API_KEY || '',
+    JWT_SECRET: process.env.JWT_SECRET || 'dev_only_secret_NOT_for_production',
+    GROQ_API_KEY: process.env.GROQ_API_KEY || '',
     APP_URL: process.env.APP_URL || 'http://localhost:3000',
     NODE_ENV: process.env.NODE_ENV || 'development',
     PORT: parseInt(process.env.PORT || '3000', 10),
@@ -22,12 +31,13 @@ export function validateEnv(): void {
     if (!process.env.JWT_SECRET) missing.push('JWT_SECRET');
 
     if (missing.length > 0) {
-        const level = env.NODE_ENV === 'production' ? '❌' : '⚠️';
+        const level = isProd ? '❌' : '⚠️';
         console.error(`${level}  Missing critical env vars: ${missing.join(', ')}`);
+        // Already exited above for JWT_SECRET in production
     }
 
-    if (!process.env.GEMINI_API_KEY) {
-        console.warn('⚠️  GEMINI_API_KEY not set — AI analysis will be unavailable');
+    if (!process.env.GROQ_API_KEY) {
+        console.warn('⚠️  GROQ_API_KEY not set — AI analysis will be unavailable');
     }
 
     console.log(`✅ Environment: ${env.NODE_ENV} | Vercel: ${env.IS_VERCEL}`);

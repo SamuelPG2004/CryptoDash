@@ -1,74 +1,37 @@
 import rateLimit from 'express-rate-limit';
 
-/**
- * Rate limiter for authentication routes (login, register).
- * 20 requests per 15 minutes per IP.
- *
- * NOTE: In Vercel serverless, the in-memory store resets on cold starts.
- * For production SaaS, replace with a Redis-backed store (e.g., rate-limit-redis).
- */
+// ─── Rate limiters ────────────────────────────────────────────────────────
+// Note: X-Forwarded-For is read correctly because `trust proxy` is configured
+// in server.ts for production/Vercel environments. No manual keyGenerator needed.
+
 export const authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
+    windowMs: 15 * 60 * 1000,  // 15 minutes
     max: 20,
-    message: {
-        status: 'error',
-        message: 'Demasiados intentos de autenticación. Intenta de nuevo en 15 minutos.',
-    },
+    message: { status: 'error', message: 'Demasiados intentos.' },
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => {
-        // Soporte para Vercel/proxies: usa X-Forwarded-For si existe
-        const xfwd = req.headers['x-forwarded-for'];
-        if (typeof xfwd === 'string') {
-            return xfwd.split(',')[0].trim();
-        } else if (Array.isArray(xfwd)) {
-            return xfwd[0].trim();
-        }
-        return req.ip;
-    },
 });
 
-/**
- * Rate limiter for AI analysis endpoints.
- * 10 requests per minute per IP.
- */
 export const aiLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 minute
+    windowMs: 1 * 60 * 1000,   // 1 minute
     max: 10,
-    message: {
-        status: 'error',
-        message: 'Demasiadas solicitudes de análisis IA. Espera un momento.',
-    },
+    message: { status: 'error', message: 'Demasiadas solicitudes de IA.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
-/**
- * Rate limiter for trading operations (buy/sell).
- * 30 requests per minute per IP.
- */
 export const tradeLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000, // 1 minute
+    windowMs: 1 * 60 * 1000,   // 1 minute
     max: 30,
-    message: {
-        status: 'error',
-        message: 'Demasiadas operaciones de trading. Espera un momento.',
-    },
+    message: { status: 'error', message: 'Demasiadas operaciones.' },
     standardHeaders: true,
     legacyHeaders: false,
 });
 
-/**
- * General API rate limiter.
- * 100 requests per minute per IP.
- */
 export const generalLimiter = rateLimit({
-    windowMs: 1 * 60 * 1000,
+    windowMs: 1 * 60 * 1000,   // 1 minute
     max: 100,
-    message: {
-        status: 'error',
-        message: 'Demasiadas solicitudes. Intenta de nuevo en un momento.',
-    },
+    message: { status: 'error', message: 'Demasiadas solicitudes.' },
     standardHeaders: true,
     legacyHeaders: false,
 });

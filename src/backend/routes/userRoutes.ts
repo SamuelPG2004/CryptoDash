@@ -13,7 +13,7 @@ import {
 import { protect } from '../middleware/auth.js';
 import { validate } from '../middleware/validate.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
-import { tradeLimiter } from '../middleware/rateLimiter.js';
+import { tradeLimiter, authLimiter } from '../middleware/rateLimiter.js';
 import {
   updateProfileSchema,
   updatePasswordSchema,
@@ -27,8 +27,9 @@ const router = express.Router();
 // All user routes require authentication
 router.get('/profile', protect, asyncHandler(getProfile));
 router.post('/favorites', protect, validate(toggleFavoriteSchema), asyncHandler(toggleFavorite));
-router.post('/validate-pin', protect, validate(validatePinSchema), asyncHandler(validatePin));
-router.put('/password', protect, validate(updatePasswordSchema), asyncHandler(updatePassword));
+// Fix #10: validate-pin needs rate limiting — a 4-digit PIN has only 10,000 combinations
+router.post('/validate-pin', protect, authLimiter, validate(validatePinSchema), asyncHandler(validatePin));
+router.put('/password', protect, authLimiter, validate(updatePasswordSchema), asyncHandler(updatePassword));
 router.put('/profile', protect, validate(updateProfileSchema), asyncHandler(updateProfile));
 
 // Trading routes — rate limited + validated

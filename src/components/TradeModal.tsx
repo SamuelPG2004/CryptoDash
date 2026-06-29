@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Wallet } from 'lucide-react';
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
-function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
-}
+import { cn } from '../lib/cn';
 
 interface Coin {
   id: string;

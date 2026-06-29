@@ -1,0 +1,23 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "allowImportingTsExtensions": false,
+    "noEmit": true,
+    "types": ["vitest/globals"]
+  },
+  "include": [
+    "src/backend/__tests__/**/*.ts",
+    "src/backend/models/**/*.ts",
+    "src/backend/services/**/*.ts",
+    "src/backend/middleware/**/*.ts",
+    "src/backend/utils/**/*.ts",
+    "src/backend/config/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/__tests__"
+  ]
+}

@@ -24,7 +24,7 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
     const token = jwt.sign(
       { id: user._id.toString(), email: user.email },
       env.JWT_SECRET,
-      { expiresIn: '30d' },
+      { expiresIn: '7d' },
     );
 
     logger.audit('USER_REGISTER', user._id.toString(), { email: user.email, country });
@@ -70,7 +70,7 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     const token = jwt.sign(
       { id: user._id.toString(), email: user.email },
       env.JWT_SECRET,
-      { expiresIn: '30d' },
+      { expiresIn: '7d' },
     );
 
     logger.audit('USER_LOGIN', user._id.toString(), { email: user.email });

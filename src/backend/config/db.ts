@@ -9,7 +9,8 @@ let isConnected = false;
  * - Tracks connection state to avoid redundant reconnections across warm invocations.
  */
 export async function connectToDatabase(): Promise<void> {
-    if (isConnected && mongoose.connection.readyState === 1) {
+    if (mongoose.connection.readyState === 1) {
+        isConnected = true;
         return;
     }
 

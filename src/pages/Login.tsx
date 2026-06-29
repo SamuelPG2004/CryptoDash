@@ -17,11 +17,12 @@ const Login: React.FC = () => {
     setError('');
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/login', { email, password });
-      login(data.token, data);
+      const { data } = await api.post<{ token: string }>('/auth/login', { email, password });
+      await login(data.token);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg ?? 'Error al iniciar sesión');
     } finally {
       setLoading(false);
     }

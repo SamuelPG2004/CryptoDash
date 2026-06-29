@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { io, Socket } from 'socket.io-client';
+import { io } from 'socket.io-client';
+import type { Socket } from 'socket.io-client';
 
 let socket: Socket | null = null;
 
@@ -9,10 +10,16 @@ export function useSocketNotifications() {
 
   useEffect(() => {
     if (!user) return;
+
+    // Fix #3: send the JWT (not user.id) so the server can verify identity
+    // before adding this socket to the private room.
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
     if (!socket) {
       socket = io();
     }
-    socket.emit('auth', user.id);
+    socket.emit('auth', token);
 
     const handleAlert = (data: any) => {
       // Aquí puedes mostrar un toast o actualizar el estado global

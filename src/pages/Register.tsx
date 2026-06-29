@@ -65,14 +65,15 @@ const Register: React.FC = () => {
 
     setLoading(true);
     try {
-      const { data } = await api.post('/auth/register', {
+      const { data } = await api.post<{ token: string }>('/auth/register', {
         ...formData,
         age: ageNum
       });
-      login(data.token, data);
+      await login(data.token);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(msg ?? 'Error al crear la cuenta');
     } finally {
       setLoading(false);
     }

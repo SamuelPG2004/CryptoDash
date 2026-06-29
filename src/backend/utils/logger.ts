@@ -1,28 +1,41 @@
 /**
- * Structured JSON logger for auditing and debugging.
- * Outputs structured JSON logs for easy parsing by log aggregators (Vercel, Datadog, etc).
+ * @fileoverview logger — Logger estructurado JSON para CryptoDash.
+ *
+ * Emite JSON estructurado por stdout/stderr para integración directa con
+ * agregadores de logs (Vercel Logs, Datadog, Logtail, etc.).
+ *
+ * REFACTORIZACIÓN:
+ *  - Eliminado `Record<string, any>` → tipado como `Record<string, unknown>`
+ *  - En NODE_ENV=test los logs de nivel INFO se silencian para output de test limpio
+ *  - Audit logs siempre visibles (nivel AUDIT nunca se silencia)
+ *
+ * @module utils/logger
  */
 
-const getTimestamp = () => new Date().toISOString();
+const isTest = process.env.NODE_ENV === 'test';
+const getTimestamp = (): string => new Date().toISOString();
 
 export const logger = {
-    info: (message: string, meta?: Record<string, any>) => {
+    info: (message: string, meta?: Record<string, unknown>): void => {
+        if (isTest) return;  // Silenciar INFO en tests para output limpio
         console.log(JSON.stringify({ level: 'INFO', timestamp: getTimestamp(), message, ...meta }));
     },
 
-    warn: (message: string, meta?: Record<string, any>) => {
+    warn: (message: string, meta?: Record<string, unknown>): void => {
+        if (isTest) return;  // Silenciar WARN en tests
         console.warn(JSON.stringify({ level: 'WARN', timestamp: getTimestamp(), message, ...meta }));
     },
 
-    error: (message: string, meta?: Record<string, any>) => {
+    error: (message: string, meta?: Record<string, unknown>): void => {
+        // Los ERROR siempre se muestran, incluso en tests — son bugs reales
         console.error(JSON.stringify({ level: 'ERROR', timestamp: getTimestamp(), message, ...meta }));
     },
 
     /**
-     * Audit log for sensitive operations (register, login, buy, sell, profile changes).
-     * These logs should be retained for compliance and security review.
+     * Log de auditoría para operaciones sensibles (login, buy, sell, cambios de perfil).
+     * NUNCA se silencia — es un registro de compliance y seguridad.
      */
-    audit: (action: string, userId: string, meta?: Record<string, any>) => {
+    audit: (action: string, userId: string, meta?: Record<string, unknown>): void => {
         console.log(JSON.stringify({
             level: 'AUDIT',
             timestamp: getTimestamp(),
