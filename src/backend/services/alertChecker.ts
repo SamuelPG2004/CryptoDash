@@ -33,6 +33,7 @@
  */
 
 import User from '../models/User.js';
+import { connectToDatabase } from '../config/db.js';
 import { getCachedPrices } from './priceCache.js';
 import { logger } from '../utils/logger.js';
 import type { Server as SocketIOServer } from 'socket.io';
@@ -148,6 +149,7 @@ async function runAlertCheckCycle(io?: SocketIOServer): Promise<void> {
     // ── 2. Consultar usuarios con alertas activas ────────────────────────────
     let users: IUser[];
     try {
+        await connectToDatabase();
         // El índice `alerts.active` (definido en User.ts) hace esta query O(log n)
         users = await User.find({ 'alerts.active': true }).select('alerts email fullName');
     } catch (dbErr: unknown) {

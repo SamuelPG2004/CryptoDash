@@ -4,7 +4,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import { env, validateEnv } from './src/backend/config/env.js';
-import { requireDB } from './src/backend/config/db.js';
+import { requireDB, connectToDatabase } from './src/backend/config/db.js';
 import { errorHandler } from './src/backend/middleware/errorHandler.js';
 import { generalLimiter } from './src/backend/middleware/rateLimiter.js';
 import authRoutes from './src/backend/routes/authRoutes.js';
@@ -133,10 +133,18 @@ if (!env.IS_VERCEL && env.NODE_ENV !== 'production') {
 // ─── Start HTTP server (only when running directly, not on Vercel) ───────
 
 if (!env.IS_VERCEL && env.NODE_ENV !== 'test') {
-  server.listen(env.PORT, '0.0.0.0', () => {
-    console.log(`\uD83D\uDE80 Server running on http://localhost:${env.PORT}`);
-    // Start alert checker only in persistent server mode (not Vercel serverless)
+  const startServer = () => {
+    server.listen(env.PORT, '0.0.0.0', () => {
+      console.log(`🚀 Server running on http://localhost:${env.PORT}`);
+    });
+  };
+
+  connectToDatabase().then(() => {
+    startServer();
     startAlertChecker(io);
+  }).catch((err) => {
+    console.warn('⚠️ No se pudo conectar a MongoDB al iniciar el servidor (continuando sin DB):', err.message || err);
+    startServer();
   });
 
   // ─── Graceful shutdown ─────────────────────────────────────────────────
