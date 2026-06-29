@@ -54,8 +54,8 @@ const api = axios.create({
 api.interceptors.request.use(
     (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
         const token = getToken();
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
+        if (token && config.headers) {
+            config.headers.set('Authorization', `Bearer ${token}`);
         }
         return config;
     },

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Wallet } from 'lucide-react';
 import { cn } from '../lib/cn';
+import { CoinLogo } from './CoinLogo';
 
 interface Coin {
   id: string;
@@ -99,7 +100,7 @@ const TradeModal: React.FC<TradeModalProps> = ({
           <div className="flex items-center gap-4">
             <div className="relative">
               <div className={cn('absolute inset-0 blur-xl rounded-full opacity-30', isBuy ? 'bg-emerald-500' : 'bg-rose-500')} />
-              <img src={coin.image} alt={`Logo de ${coin.name}`} className="w-12 h-12 rounded-xl relative border border-zinc-800 bg-zinc-900 p-1" />
+              <CoinLogo symbol={coin.symbol} name={coin.name} image={coin.image} className="w-12 h-12 rounded-xl relative border border-zinc-800 bg-zinc-900 p-1" />
             </div>
             <div>
               <p className="text-zinc-400 text-xs font-bold uppercase tracking-widest">

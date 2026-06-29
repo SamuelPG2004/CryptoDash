@@ -72,21 +72,26 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// ─── Security middleware ──────────────────────────────────────────────────
+// ─── Security middleware ──────────────────────────────────────────────
 // Fix #5: configure a real CSP instead of disabling it entirely.
+// In development, Vite dev server injects inline scripts for HMR and module
+// loading that are incompatible with a strict CSP. Disable CSP in dev to
+// avoid blocking the frontend; enforce it in production only.
 app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc:  ["'self'"],
-      scriptSrc:   ["'self'"],
-      styleSrc:    ["'self'", "'unsafe-inline'"],           // Tailwind inlines styles
-      imgSrc:      ["'self'", "data:", "https://assets.coingecko.com"],
-      connectSrc:  ["'self'", "https://api.coingecko.com", "https://api.groq.com"],
-      fontSrc:     ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
-      objectSrc:   ["'none'"],
-      upgradeInsecureRequests: env.NODE_ENV === 'production' ? [] : null,
-    },
-  },
+  contentSecurityPolicy: env.NODE_ENV === 'production'
+    ? {
+        directives: {
+          defaultSrc:  ["'self'"],
+          scriptSrc:   ["'self'"],
+          styleSrc:    ["'self'", "'unsafe-inline'"],
+          imgSrc:      ["'self'", "data:", "https://assets.coingecko.com"],
+          connectSrc:  ["'self'", "https://api.coingecko.com", "https://api.groq.com", "wss:"],
+          fontSrc:     ["'self'", "https://fonts.googleapis.com", "https://fonts.gstatic.com"],
+          objectSrc:   ["'none'"],
+          upgradeInsecureRequests: [],
+        },
+      }
+    : false,  // Disable CSP in development — Vite needs inline scripts for HMR
 }));
 app.use(express.json({ limit: '1mb' }));
 

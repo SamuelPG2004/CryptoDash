@@ -63,6 +63,7 @@ import { useCryptoPrices } from '../hooks/useCryptoPrices';
 import { useCryptoActions } from '../hooks/useCryptoActions';
 import TradeModal from './TradeModal';
 import CryptoTableErrorBoundary from './CryptoTableErrorBoundary';
+import { CoinLogo } from './CoinLogo';
 import type { Crypto, ChartDataPoint, TechnicalIndicators, TradeModalState, PortfolioItem } from '../types/crypto';
 
 // ─── Sub-componentes puros ─────────────────────────────────────────────────────
@@ -324,11 +325,11 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                             <div className="flex items-center gap-5">
                                 <div className="relative">
                                     <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full" />
-                                    <img
-                                        src={selectedCoin.image}
-                                        alt={`Logo de ${selectedCoin.name}`}
+                                    <CoinLogo
+                                        symbol={selectedCoin.symbol}
+                                        name={selectedCoin.name}
+                                        image={selectedCoin.image}
                                         className="w-16 h-16 rounded-2xl relative border border-zinc-800 bg-zinc-900 p-2"
-                                        referrerPolicy="no-referrer"
                                     />
                                 </div>
                                 <div>
@@ -566,12 +567,11 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                         <td className="p-4">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-700 shrink-0">
-                                                    <img
-                                                        src={crypto.image}
-                                                        alt={`Logo de ${crypto.name}`}
+                                                    <CoinLogo
+                                                        symbol={crypto.symbol}
+                                                        name={crypto.name}
+                                                        image={crypto.image}
                                                         className="w-full h-full object-cover"
-                                                        referrerPolicy="no-referrer"
-                                                        loading="lazy"
                                                     />
                                                 </div>
                                                 <div>
