@@ -349,7 +349,7 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
 
                             {/* Precio + Acciones */}
                             <div className="flex flex-col items-end gap-3 relative z-10">
-                                <div className="flex items-center gap-8 bg-zinc-900/50 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 shadow-xl">
+                                <div className="flex items-center gap-4 sm:gap-8 bg-zinc-900/50 backdrop-blur-md p-4 rounded-2xl border border-zinc-800 shadow-xl">
                                     <div className="text-right">
                                         <div className="text-xs text-zinc-500 font-bold uppercase tracking-wider mb-1">Precio actual</div>
                                         <div className="text-3xl font-black text-white font-mono">
@@ -542,14 +542,14 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                     </div>
 
                     {/* Tabla */}
-                    <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
+                    <div className="max-h-[500px] overflow-auto custom-scrollbar">
                         <table className="w-full text-left border-collapse" aria-label="Tabla de mercado de criptomonedas">
                             <thead className="sticky top-0 z-10 bg-zinc-950 shadow-sm">
                                 <tr className="border-b border-zinc-800 text-zinc-500 text-xs uppercase tracking-wider">
-                                    <th className="p-4 font-medium" scope="col">Activo</th>
-                                    <th className="p-4 font-medium" scope="col">Precio</th>
-                                    <th className="p-4 font-medium" scope="col">Cambio 24h</th>
-                                    <th className="p-4 font-medium text-right" scope="col">Acción</th>
+                                    <th className="p-4 font-medium whitespace-nowrap" scope="col">Activo</th>
+                                    <th className="p-4 font-medium whitespace-nowrap" scope="col">Precio</th>
+                                    <th className="p-4 font-medium whitespace-nowrap" scope="col">Cambio 24h</th>
+                                    <th className="p-4 font-medium text-right whitespace-nowrap" scope="col">Acción</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-zinc-900">
@@ -564,7 +564,7 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                         aria-selected={selectedCoinId === crypto.id}
                                     >
                                         {/* Activo */}
-                                        <td className="p-4">
+                                        <td className="p-4 whitespace-nowrap">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center overflow-hidden border border-zinc-700 shrink-0">
                                                     <CoinLogo
@@ -586,7 +586,7 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                         </td>
 
                                         {/* Precio */}
-                                        <td className="p-4 font-mono text-white">
+                                        <td className="p-4 font-mono text-white whitespace-nowrap">
                                             ${crypto.current_price.toLocaleString(undefined, {
                                                 minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
@@ -594,7 +594,7 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                         </td>
 
                                         {/* Cambio 24h */}
-                                        <td className="p-4">
+                                        <td className="p-4 whitespace-nowrap">
                                             <div className={cn(
                                                 'flex items-center gap-1 font-mono text-sm px-2 py-1 rounded-md w-fit',
                                                 crypto.price_change_percentage_24h > 0
@@ -613,7 +613,7 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                         </td>
 
                                         {/* Favorito */}
-                                        <td className="p-4 text-right">
+                                        <td className="p-4 text-right whitespace-nowrap">
                                             {user && (
                                                 <button
                                                     onClick={(e) => handleToggleFavorite(e, crypto.id)}

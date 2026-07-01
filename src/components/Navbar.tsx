@@ -26,7 +26,7 @@ const Navbar: React.FC = () => {
           <span>CRYPTO<span className="text-emerald-500">DASH</span></span>
         </Link>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
           {user ? (
             <>
               <Link to="/favorites" className="flex items-center gap-1 hover:text-emerald-400 transition-colors">
