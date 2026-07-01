@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { logger } from '../utils/logger.js';
+import { getRedisClient } from '../config/redis.js';
 
 /**
  * Shared in-memory price cache for server-side price verification.
@@ -63,7 +64,17 @@ export async function refreshPriceCache(): Promise<void> {
       }));
 
     lastFetchTime = Date.now();
-    logger.info(`[PriceCache] Refreshed — ${cachedCoins.length} coins cached`);
+    logger.info(`[PriceCache] Refreshed — ${cachedCoins.length} coins cached (L1)`);
+
+    const redis = getRedisClient();
+    if (redis) {
+      // Guardar en Redis (L2 Cache)
+      await redis.set('crypto_prices', JSON.stringify({
+        timestamp: lastFetchTime,
+        data: cachedCoins
+      }), { EX: 300 }); // Expira en 5 minutos
+      logger.info(`[PriceCache] Saved to Redis (L2)`);
+    }
   } catch (err: any) {
     logger.warn('[PriceCache] CoinGecko fetch failed, keeping stale cache', { error: err.message });
   } finally {
@@ -76,6 +87,21 @@ export async function refreshPriceCache(): Promise<void> {
  * Used by cryptoRoutes to serve the frontend.
  */
 export async function getCachedPrices(): Promise<CachedCoin[]> {
+  const redis = getRedisClient();
+  if (redis) {
+    try {
+      const cached = await redis.get('crypto_prices');
+      if (cached) {
+        const parsed = JSON.parse(cached as string);
+        // Usar los datos de Redis si existen
+        return parsed.data;
+      }
+    } catch (err: any) {
+      logger.warn('[PriceCache] Failed to read from Redis, falling back to L1', { error: err.message });
+    }
+  }
+
+  // Fallback a la memoria L1
   const stale = Date.now() - lastFetchTime > CACHE_DURATION;
   if (stale || cachedCoins.length === 0) {
     await refreshPriceCache();
@@ -91,11 +117,7 @@ export async function getCachedPrices(): Promise<CachedCoin[]> {
  * for financial operations (buy/sell). Never trust req.body.price.
  */
 export async function getVerifiedPrice(coinId: string): Promise<number | null> {
-  // Refresh cache if stale
-  if (Date.now() - lastFetchTime > CACHE_DURATION || cachedCoins.length === 0) {
-    await refreshPriceCache();
-  }
-
-  const coin = cachedCoins.find(c => c.id === coinId);
+  const coins = await getCachedPrices();
+  const coin = coins.find(c => c.id === coinId);
   return coin ? coin.price : null;
 }

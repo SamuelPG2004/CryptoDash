@@ -5,6 +5,7 @@ import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import { env, validateEnv } from './src/backend/config/env.js';
 import { requireDB, connectToDatabase } from './src/backend/config/db.js';
+import { initRedis } from './src/backend/config/redis.js';
 import { errorHandler } from './src/backend/middleware/errorHandler.js';
 import { generalLimiter } from './src/backend/middleware/rateLimiter.js';
 import { setupViteDevServer } from './src/backend/config/viteDevServer.js';
@@ -128,12 +129,14 @@ if (!env.IS_VERCEL && env.NODE_ENV !== 'test') {
     });
   };
 
-  connectToDatabase().then(() => {
+  Promise.all([
+    connectToDatabase().catch((err) => {
+      console.warn('⚠️ No se pudo conectar a MongoDB al iniciar el servidor (continuando sin DB):', err.message || err);
+    }),
+    initRedis()
+  ]).then(() => {
     startServer();
     startAlertChecker(io);
-  }).catch((err) => {
-    console.warn('⚠️ No se pudo conectar a MongoDB al iniciar el servidor (continuando sin DB):', err.message || err);
-    startServer();
   });
 
   // ─── Graceful shutdown ─────────────────────────────────────────────────
