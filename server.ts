@@ -7,6 +7,8 @@ import { env, validateEnv } from './src/backend/config/env.js';
 import { requireDB, connectToDatabase } from './src/backend/config/db.js';
 import { errorHandler } from './src/backend/middleware/errorHandler.js';
 import { generalLimiter } from './src/backend/middleware/rateLimiter.js';
+import { setupViteDevServer } from './src/backend/config/viteDevServer.js';
+import { setupStaticServer } from './src/backend/config/staticServer.js';
 import authRoutes from './src/backend/routes/authRoutes.js';
 import userRoutes from './src/backend/routes/userRoutes.js';
 import cryptoRoutes from './src/backend/routes/cryptoRoutes.js';
@@ -113,27 +115,9 @@ app.use('/api/news', newsRoutes);
 // ─── Centralized error handler (MUST be after all routes) ────────────────
 app.use(errorHandler);
 
-// ─── Vite dev server (only in local development, skipped on Vercel) ──────
-if (!env.IS_VERCEL && env.NODE_ENV !== 'production') {
-  (async () => {
-    try {
-      const { createServer: createViteServer } = await import('vite');
-      const vite = await createViteServer({
-        server: { middlewareMode: true },
-        appType: 'spa',
-      });
-      app.use(vite.middlewares);
-    } catch (err) {
-      console.error('Failed to start Vite dev server:', err);
-    }
-  })();
-} else if (!env.IS_VERCEL) {
-  // Production build served locally
-  app.use(express.static('dist'));
-  app.get('*', (_req, res) => {
-    res.sendFile('dist/index.html', { root: '.' });
-  });
-}
+// ─── Frontend serving (dev = Vite, prod local = static build, Vercel = none) ─
+setupViteDevServer(app);
+setupStaticServer(app);
 
 // ─── Start HTTP server (only when running directly, not on Vercel) ───────
 
