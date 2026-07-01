@@ -372,20 +372,20 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                 </div>
 
                                 {/* Botones de acción — solo visibles para usuarios autenticados */}
-                                <div className="flex gap-2">
+                                <div className="flex flex-wrap justify-end gap-2">
                                     {user ? (
                                         <>
                                             <button
                                                 id="btn-buy"
                                                 onClick={() => handleOpenTrade('buy')}
-                                                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-900/20 active:scale-95"
+                                                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black uppercase tracking-widest px-4 sm:px-6 py-3 rounded-xl transition-all shadow-lg shadow-emerald-900/20 active:scale-95"
                                             >
                                                 Comprar
                                             </button>
                                             <button
                                                 id="btn-sell"
                                                 onClick={() => handleOpenTrade('sell')}
-                                                className="bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-black uppercase tracking-widest px-6 py-3 rounded-xl transition-all active:scale-95"
+                                                className="bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-black uppercase tracking-widest px-4 sm:px-6 py-3 rounded-xl transition-all active:scale-95"
                                             >
                                                 Vender
                                             </button>

@@ -52,7 +52,7 @@ const MarketTicker: React.FC = () => {
     <div className="bg-zinc-950/50 backdrop-blur-md border-b border-zinc-900 overflow-hidden py-3">
       <div className="flex whitespace-nowrap animate-marquee">
         {tickerItems.map((item, i) => (
-          <div key={i} className="flex items-center gap-3 px-10 border-r border-zinc-800/50 last:border-0">
+          <div key={i} className="flex items-center gap-3 px-4 sm:px-10 border-r border-zinc-800/50 last:border-0">
             <span className="text-zinc-500 font-black text-[10px] tracking-widest">{item.symbol}</span>
             <span className="text-white font-mono text-xs font-bold">
               ${item.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -88,7 +88,7 @@ const Home: React.FC = () => {
               <span className="font-bold tracking-widest uppercase text-[10px]">{t('marketTicker')}</span>
             </div>
 
-            <h1 className="text-5xl sm:text-8xl font-black text-white tracking-tighter mb-8 leading-[0.9] max-w-4xl mx-auto uppercase">
+            <h1 className="text-4xl sm:text-8xl font-black text-white tracking-tighter mb-8 leading-[0.9] max-w-4xl mx-auto uppercase break-words">
               {t('heroTitle1')} <span className="bg-gradient-to-r from-emerald-400 to-emerald-600 bg-clip-text text-transparent drop-shadow-[0_0_25px_rgba(16,185,129,0.3)]">{t('heroTitle2')}</span> <br />
               <span className="text-zinc-600 italic font-light lowercase">{t('heroTitle3')}</span>
             </h1>
@@ -120,7 +120,7 @@ const Home: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mt-20">
             {/* Main Content: Table & Charts */}
             <div className="lg:col-span-2 space-y-8">
-              <div className="flex items-end justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
                 <div>
                   <h2 className="text-3xl font-black text-white tracking-tight">{t('leadingAssets')}</h2>
                   <p className="text-zinc-500 text-sm mt-1">{t('leadingAssetsDesc')}</p>
