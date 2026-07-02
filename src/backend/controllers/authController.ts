@@ -29,6 +29,32 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     logger.audit('USER_REGISTER', user._id.toString(), { email: user.email, country });
 
+    // --- NUEVO: RESEND ---
+    // Envío fire-and-forget del correo de bienvenida. No se espera la respuesta
+    // para no retrasar la respuesta HTTP al cliente. Cualquier fallo se aísla
+    // con un console.error y no afecta el registro ni la base de datos.
+    (async () => {
+      try {
+        const resendApiKey = process.env.RESEND_API_KEY;
+        if (!resendApiKey) return;
+
+        const { Resend } = await import('resend');
+        const resend = new Resend(resendApiKey);
+
+        await resend.emails.send({
+          from: 'CryptoDash <onboarding@resend.dev>',
+          to: user.email,
+          subject: 'Bienvenido a CryptoDash',
+          html: `<p>Hola <strong>${user.fullName}</strong>,</p>
+                 <p>Gracias por registrarte en <strong>CryptoDash</strong>. Tu cuenta está lista para empezar a gestionar activos digitales.</p>
+                 <p>Saludos,<br>El equipo de CryptoDash</p>`,
+        });
+      } catch (err: any) {
+        console.error('Resend welcome email failed:', err.message || err);
+      }
+    })();
+    // --- FIN NUEVO: RESEND ---
+
     res.status(201).json({
       id: user._id,
       email: user.email,
