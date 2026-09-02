@@ -1,8 +1,10 @@
 import { Request, Response, NextFunction } from 'express';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
+import { sendEmail, escapeHtml } from '../services/emailService.js';
 
 /**
  * POST /api/auth/register
@@ -29,31 +31,15 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
 
     logger.audit('USER_REGISTER', user._id.toString(), { email: user.email, country });
 
-    // --- NUEVO: RESEND ---
     // Envío fire-and-forget del correo de bienvenida. No se espera la respuesta
-    // para no retrasar la respuesta HTTP al cliente. Cualquier fallo se aísla
-    // con un console.error y no afecta el registro ni la base de datos.
-    (async () => {
-      try {
-        const resendApiKey = process.env.RESEND_API_KEY;
-        if (!resendApiKey) return;
-
-        const { Resend } = await import('resend');
-        const resend = new Resend(resendApiKey);
-
-        await resend.emails.send({
-          from: 'CryptoDash <onboarding@resend.dev>',
-          to: user.email,
-          subject: 'Bienvenido a CryptoDash',
-          html: `<p>Hola <strong>${user.fullName}</strong>,</p>
-                 <p>Gracias por registrarte en <strong>CryptoDash</strong>. Tu cuenta está lista para empezar a gestionar activos digitales.</p>
-                 <p>Saludos,<br>El equipo de CryptoDash</p>`,
-        });
-      } catch (err: any) {
-        console.error('Resend welcome email failed:', err.message || err);
-      }
-    })();
-    // --- FIN NUEVO: RESEND ---
+    // para no retrasar la respuesta HTTP al cliente; emailService aísla los fallos.
+    void sendEmail({
+      to: user.email,
+      subject: 'Bienvenido a CryptoDash',
+      html: `<p>Hola <strong>${escapeHtml(user.fullName)}</strong>,</p>
+             <p>Gracias por registrarte en <strong>CryptoDash</strong>. Tu cuenta está lista para empezar a gestionar activos digitales.</p>
+             <p>Saludos,<br>El equipo de CryptoDash</p>`,
+    });
 
     res.status(201).json({
       id: user._id,
@@ -116,6 +102,86 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
     });
   } catch (error: any) {
     logger.error('Login error', { error: error.message });
+    next(error);
+  }
+};
+
+/** Duración de validez del token de recuperación de contraseña: 1 hora */
+const RESET_TOKEN_TTL_MS = 60 * 60 * 1_000;
+
+/** Hashea el token de recuperación — en BD solo se guarda el hash, nunca el token en claro */
+const hashResetToken = (token: string): string =>
+  crypto.createHash('sha256').update(token).digest('hex');
+
+/**
+ * POST /api/auth/forgot-password
+ * Genera un token de recuperación de un solo uso y lo envía por correo.
+ * Responde SIEMPRE con el mismo mensaje genérico, exista o no la cuenta,
+ * para no permitir enumeración de usuarios registrados.
+ */
+export const forgotPassword = async (req: Request, res: Response, next: NextFunction) => {
+  const { email } = req.body;
+  const genericResponse = {
+    message: 'Si existe una cuenta con ese correo, recibirás un enlace para restablecer tu contraseña.',
+  };
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.json(genericResponse);
+    }
+
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    user.resetPasswordToken = hashResetToken(rawToken);
+    user.resetPasswordExpires = new Date(Date.now() + RESET_TOKEN_TTL_MS);
+    await user.save();
+
+    const resetUrl = `${env.APP_URL}/reset-password?token=${rawToken}`;
+    await sendEmail({
+      to: user.email,
+      subject: 'Restablece tu contraseña — CryptoDash',
+      html: `<p>Hola <strong>${escapeHtml(user.fullName)}</strong>,</p>
+             <p>Recibimos una solicitud para restablecer tu contraseña en <strong>CryptoDash</strong>.</p>
+             <p><a href="${resetUrl}">Haz clic aquí para crear una nueva contraseña</a></p>
+             <p>El enlace expira en 1 hora. Si no solicitaste este cambio, puedes ignorar este correo — tu contraseña actual sigue siendo válida.</p>
+             <p>Saludos,<br>El equipo de CryptoDash</p>`,
+    });
+
+    logger.audit('PASSWORD_RESET_REQUESTED', user._id.toString(), { email: user.email });
+    res.json(genericResponse);
+  } catch (error: any) {
+    logger.error('Forgot password error', { error: error.message });
+    next(error);
+  }
+};
+
+/**
+ * POST /api/auth/reset-password
+ * Valida el token de recuperación y establece la nueva contraseña.
+ * El token es de un solo uso: se borra de la BD al completar el cambio.
+ */
+export const resetPassword = async (req: Request, res: Response, next: NextFunction) => {
+  const { token, password } = req.body;
+
+  try {
+    const user = await User.findOne({
+      resetPasswordToken: hashResetToken(token),
+      resetPasswordExpires: { $gt: new Date() },
+    }).select('+resetPasswordToken +resetPasswordExpires');
+
+    if (!user) {
+      return res.status(400).json({ message: 'El enlace es inválido o ha expirado. Solicita uno nuevo.' });
+    }
+
+    user.password = password;  // el hook pre-save la hashea con bcrypt
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+
+    logger.audit('PASSWORD_RESET_COMPLETED', user._id.toString(), { email: user.email });
+    res.json({ message: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.' });
+  } catch (error: any) {
+    logger.error('Reset password error', { error: error.message });
     next(error);
   }
 };

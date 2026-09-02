@@ -4,12 +4,17 @@ import rateLimit from 'express-rate-limit';
 // Note: X-Forwarded-For is read correctly because `trust proxy` is configured
 // in server.ts for production/Vercel environments. No manual keyGenerator needed.
 
+// In tests every request comes from the same IP and the in-memory store is
+// shared across the whole suite, so the limiters would return spurious 429s.
+const skipInTests = () => process.env.NODE_ENV === 'test';
+
 export const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,  // 15 minutes
     max: 20,
     message: { status: 'error', message: 'Demasiados intentos.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: skipInTests,
 });
 
 export const aiLimiter = rateLimit({
@@ -18,6 +23,7 @@ export const aiLimiter = rateLimit({
     message: { status: 'error', message: 'Demasiadas solicitudes de IA.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: skipInTests,
 });
 
 export const tradeLimiter = rateLimit({
@@ -26,6 +32,7 @@ export const tradeLimiter = rateLimit({
     message: { status: 'error', message: 'Demasiadas operaciones.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: skipInTests,
 });
 
 export const generalLimiter = rateLimit({
@@ -34,4 +41,5 @@ export const generalLimiter = rateLimit({
     message: { status: 'error', message: 'Demasiadas solicitudes.' },
     standardHeaders: true,
     legacyHeaders: false,
+    skip: skipInTests,
 });

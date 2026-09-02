@@ -58,6 +58,10 @@ export interface IUser extends Document {
     wallet:      number;
     portfolio:   IPortfolioItem[];
     alerts:      IAlert[];
+    /** Hash SHA-256 del token de recuperación de contraseña (nunca el token en claro) */
+    resetPasswordToken?:   string;
+    /** Expiración del token de recuperación (1 hora desde la solicitud) */
+    resetPasswordExpires?: Date;
     createdAt:   Date;
     comparePassword: (password: string) => Promise<boolean>;
     comparePin:      (pin: string)      => Promise<boolean>;
@@ -100,6 +104,10 @@ const userSchema = new mongoose.Schema<IUser>({
         targetPrice: { type: Number, required: true },
         active:      { type: Boolean, default: true },
     }],
+    // select: false — nunca se incluyen en queries normales; solo se consultan
+    // por filtro en el flujo de reset (findOne por hash) sin leer su valor.
+    resetPasswordToken:   { type: String, select: false },
+    resetPasswordExpires: { type: Date,   select: false },
 }, {
     timestamps: true,
 });

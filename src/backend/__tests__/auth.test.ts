@@ -15,6 +15,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import request from 'supertest';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 import {
     connectTestDatabase,
     clearDatabase,
@@ -125,5 +126,112 @@ describe('GET /api/users/profile (protección de ruta)', () => {
     it('debe devolver 401 si no hay token de autenticación', async () => {
         const res = await request(app).get('/api/users/profile');
         expect(res.statusCode).toBe(401);
+    });
+});
+
+// ─── Recuperación de contraseña ────────────────────────────────────────────────
+
+describe('POST /api/auth/forgot-password', () => {
+    beforeEach(async () => {
+        await request(app).post('/api/auth/register').send(validRegisterPayload);
+    });
+
+    it('debe responder 200 con mensaje genérico para un email registrado', async () => {
+        const res = await request(app)
+            .post('/api/auth/forgot-password')
+            .send({ email: validRegisterPayload.email });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body.message).toMatch(/si existe una cuenta/i);
+
+        // El token (hasheado) debe quedar persistido en la BD
+        const user = await mongoose.model('User')
+            .findOne({ email: validRegisterPayload.email })
+            .select('+resetPasswordToken +resetPasswordExpires');
+        expect(user?.resetPasswordToken).toBeDefined();
+        expect(user?.resetPasswordExpires?.getTime()).toBeGreaterThan(Date.now());
+    });
+
+    it('debe responder 200 con el MISMO mensaje para un email no registrado (anti-enumeración)', async () => {
+        const res = await request(app)
+            .post('/api/auth/forgot-password')
+            .send({ email: 'nobody@cryptodash.test' });
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body.message).toMatch(/si existe una cuenta/i);
+    });
+});
+
+describe('POST /api/auth/reset-password', () => {
+    /** Inserta directamente un token de reset válido y devuelve el token en claro */
+    async function seedResetToken(expiresInMs = 60 * 60 * 1000): Promise<string> {
+        const rawToken = crypto.randomBytes(32).toString('hex');
+        await mongoose.model('User').updateOne(
+            { email: validRegisterPayload.email },
+            {
+                resetPasswordToken:   crypto.createHash('sha256').update(rawToken).digest('hex'),
+                resetPasswordExpires: new Date(Date.now() + expiresInMs),
+            },
+        );
+        return rawToken;
+    }
+
+    beforeEach(async () => {
+        await request(app).post('/api/auth/register').send(validRegisterPayload);
+    });
+
+    it('debe cambiar la contraseña con un token válido y permitir login con la nueva', async () => {
+        const rawToken = await seedResetToken();
+
+        const res = await request(app)
+            .post('/api/auth/reset-password')
+            .send({ token: rawToken, password: 'NewPassword456!' });
+
+        expect(res.statusCode).toBe(200);
+
+        // La contraseña anterior ya no funciona
+        const oldLogin = await request(app)
+            .post('/api/auth/login')
+            .send({ email: validRegisterPayload.email, password: validRegisterPayload.password });
+        expect(oldLogin.statusCode).toBe(400);
+
+        // La nueva sí
+        const newLogin = await request(app)
+            .post('/api/auth/login')
+            .send({ email: validRegisterPayload.email, password: 'NewPassword456!' });
+        expect(newLogin.statusCode).toBe(200);
+        expect(newLogin.body).toHaveProperty('token');
+    });
+
+    it('debe invalidar el token tras usarlo (un solo uso)', async () => {
+        const rawToken = await seedResetToken();
+
+        await request(app)
+            .post('/api/auth/reset-password')
+            .send({ token: rawToken, password: 'NewPassword456!' });
+
+        const secondAttempt = await request(app)
+            .post('/api/auth/reset-password')
+            .send({ token: rawToken, password: 'AnotherPassword789!' });
+        expect(secondAttempt.statusCode).toBe(400);
+    });
+
+    it('debe rechazar un token inexistente → 400', async () => {
+        const res = await request(app)
+            .post('/api/auth/reset-password')
+            .send({ token: 'a'.repeat(64), password: 'NewPassword456!' });
+
+        expect(res.statusCode).toBe(400);
+        expect(res.body.message).toMatch(/inválido o ha expirado/i);
+    });
+
+    it('debe rechazar un token expirado → 400', async () => {
+        const rawToken = await seedResetToken(-1_000);  // expiró hace 1 segundo
+
+        const res = await request(app)
+            .post('/api/auth/reset-password')
+            .send({ token: rawToken, password: 'NewPassword456!' });
+
+        expect(res.statusCode).toBe(400);
     });
 });

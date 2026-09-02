@@ -35,6 +35,7 @@
 import User from '../models/User.js';
 import { connectToDatabase } from '../config/db.js';
 import { getCachedPrices } from './priceCache.js';
+import { sendEmail, escapeHtml } from './emailService.js';
 import { logger } from '../utils/logger.js';
 import type { Server as SocketIOServer } from 'socket.io';
 import type { IAlert, IUser } from '../models/User.js';
@@ -121,15 +122,50 @@ function emitAlertNotification(
 }
 
 /**
+ * Envía la notificación de alerta disparada por correo electrónico.
+ * Es el canal de notificación que funciona en entornos serverless (Vercel),
+ * donde no hay conexiones WebSocket persistentes.
+ * Se espera (await) porque en serverless un envío fire-and-forget puede
+ * morir cuando la función termina.
+ */
+async function sendAlertEmail(
+    email:        string,
+    fullName:     string,
+    alert:        IAlert,
+    currentPrice: number,
+): Promise<void> {
+    const direction = alert.condition === 'above' ? 'superó' : 'cayó por debajo de';
+    await sendEmail({
+        to:      email,
+        subject: `🔔 Alerta de precio: ${escapeHtml(alert.symbol.toUpperCase())}`,
+        html: `<p>Hola <strong>${escapeHtml(fullName)}</strong>,</p>
+               <p>Tu alerta de precio se ha disparado: <strong>${escapeHtml(alert.symbol.toUpperCase())}</strong>
+               ${direction} tu precio objetivo de <strong>$${alert.targetPrice.toLocaleString('en-US')}</strong>.</p>
+               <p>Precio actual: <strong>$${currentPrice.toLocaleString('en-US')}</strong></p>
+               <p>Saludos,<br>El equipo de CryptoDash</p>`,
+    });
+}
+
+/** Resultado de un ciclo de verificación de alertas */
+export interface AlertCycleStats {
+    checked:   number;
+    triggered: number;
+}
+
+/**
  * Ejecuta un ciclo completo de verificación de alertas:
  *  1. Obtiene precios del caché compartido (no hace llamada a CoinGecko)
  *  2. Consulta usuarios con alertas activas
  *  3. Verifica condiciones y desactiva alertas disparadas
- *  4. Emite notificaciones por WebSocket
+ *  4. Notifica por WebSocket (si hay servidor persistente) y por correo
+ *
+ * Exportada para poder invocarla bajo demanda desde el endpoint de cron
+ * (/api/internal/check-alerts) en despliegues serverless, donde el
+ * intervalo de startAlertChecker nunca corre.
  *
  * @param io - Instancia de Socket.IO (opcional)
  */
-async function runAlertCheckCycle(io?: SocketIOServer): Promise<void> {
+export async function runAlertCheckCycle(io?: SocketIOServer): Promise<AlertCycleStats> {
     // ── 1. Obtener precios del caché compartido ──────────────────────────────
     let priceMap: Map<string, number>;
     try {
@@ -138,12 +174,12 @@ async function runAlertCheckCycle(io?: SocketIOServer): Promise<void> {
         logger.warn('[AlertChecker] No se pudo obtener el caché de precios, saltando ciclo', {
             error: err instanceof Error ? err.message : String(err),
         });
-        return;
+        return { checked: 0, triggered: 0 };
     }
 
     if (priceMap.size === 0) {
         logger.warn('[AlertChecker] Caché de precios vacío, saltando ciclo');
-        return;
+        return { checked: 0, triggered: 0 };
     }
 
     // ── 2. Consultar usuarios con alertas activas ────────────────────────────
@@ -156,7 +192,7 @@ async function runAlertCheckCycle(io?: SocketIOServer): Promise<void> {
         logger.error('[AlertChecker] Error al consultar usuarios con alertas activas', {
             error: dbErr instanceof Error ? dbErr.message : String(dbErr),
         });
-        return;
+        return { checked: 0, triggered: 0 };
     }
 
     let totalChecked   = 0;
@@ -192,6 +228,9 @@ async function runAlertCheckCycle(io?: SocketIOServer): Promise<void> {
             if (io) {
                 emitAlertNotification(io, user._id.toString(), alert, currentPrice);
             }
+
+            // ── Notificación por correo — canal que sí funciona en serverless ─
+            await sendAlertEmail(user.email, user.fullName, alert, currentPrice);
         }
 
         // Solo guarda el documento si algo cambió — reduce escrituras a MongoDB
@@ -210,6 +249,8 @@ async function runAlertCheckCycle(io?: SocketIOServer): Promise<void> {
     if (totalChecked > 0 || totalTriggered > 0) {
         logger.info(`[AlertChecker] Ciclo completo — ${totalChecked} alertas verificadas, ${totalTriggered} disparadas`);
     }
+
+    return { checked: totalChecked, triggered: totalTriggered };
 }
 
 // ─── API pública ───────────────────────────────────────────────────────────────

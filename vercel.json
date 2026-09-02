@@ -13,6 +13,12 @@
       }
     }
   ],
+  "crons": [
+    {
+      "path": "/api/internal/check-alerts",
+      "schedule": "*/5 * * * *"
+    }
+  ],
   "routes": [
     {
       "src": "/api/(.*)",

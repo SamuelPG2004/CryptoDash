@@ -15,6 +15,7 @@ import userRoutes from './src/backend/routes/userRoutes.js';
 import cryptoRoutes from './src/backend/routes/cryptoRoutes.js';
 import newsRoutes from './src/backend/routes/newsRoutes.js';
 import transactionRoutes from './src/backend/routes/transactionRoutes.js';
+import internalRoutes from './src/backend/routes/internalRoutes.js';
 import { startAlertChecker, stopAlertChecker } from './src/backend/services/alertChecker.js';
 
 // ─── Validate environment on startup ─────────────────────────────────────
@@ -112,6 +113,11 @@ app.use('/api/crypto', cryptoRoutes);
 
 // News/AI analysis does NOT need MongoDB — uses Groq API
 app.use('/api/news', newsRoutes);
+
+// Internal endpoints (Vercel Cron) — protegido con CRON_SECRET en producción.
+// En serverless el intervalo de startAlertChecker no corre; el cron invoca
+// GET /api/internal/check-alerts para verificar alertas periódicamente.
+app.use('/api/internal', internalRoutes);
 
 // ─── Centralized error handler (MUST be after all routes) ────────────────
 app.use(errorHandler);
