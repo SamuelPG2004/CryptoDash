@@ -16,7 +16,7 @@
   "crons": [
     {
       "path": "/api/internal/check-alerts",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 12 * * *"
     }
   ],
   "routes": [
