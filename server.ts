@@ -3,9 +3,10 @@ import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { env, validateEnv } from './src/backend/config/env.js';
 import { requireDB, connectToDatabase } from './src/backend/config/db.js';
-import { initRedis } from './src/backend/config/redis.js';
+import { initRedis, closeRedis } from './src/backend/config/redis.js';
 import { errorHandler } from './src/backend/middleware/errorHandler.js';
 import { generalLimiter } from './src/backend/middleware/rateLimiter.js';
 import { setupViteDevServer } from './src/backend/config/viteDevServer.js';
@@ -48,7 +49,7 @@ io.on('connection', (socket) => {
   socket.on('auth', (token: string) => {
     if (!token) return;
     try {
-      const decoded = jwt.verify(token, env.JWT_SECRET) as { id: string };
+      const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as { id: string };
       socket.join(decoded.id);
       socket.data.userId = decoded.id;
     } catch {
@@ -119,12 +120,20 @@ app.use('/api/news', newsRoutes);
 // GET /api/internal/check-alerts para verificar alertas periódicamente.
 app.use('/api/internal', internalRoutes);
 
-// ─── Centralized error handler (MUST be after all routes) ────────────────
-app.use(errorHandler);
+// ─── 404 JSON para rutas de API desconocidas ─────────────────────────────
+// Sin esto, /api/<typo> caía en el catch-all del frontend y devolvía el
+// index.html con status 200 — los clientes JSON recibían un parse error.
+app.use('/api', (_req, res) => {
+  res.status(404).json({ status: 'error', message: 'Recurso no encontrado' });
+});
 
 // ─── Frontend serving (dev = Vite, prod local = static build, Vercel = none) ─
 setupViteDevServer(app);
 setupStaticServer(app);
+
+// ─── Centralized error handler (MUST be after all routes) ────────────────
+// Registrado al final para capturar también errores del serving estático.
+app.use(errorHandler);
 
 // ─── Start HTTP server (only when running directly, not on Vercel) ───────
 
@@ -143,6 +152,11 @@ if (!env.IS_VERCEL && env.NODE_ENV !== 'test') {
   ]).then(() => {
     startServer();
     startAlertChecker(io);
+  }).catch((err) => {
+    // Si algo inesperado falla en el arranque, levantar el servidor igualmente
+    // en modo degradado (crypto/prices funciona sin DB ni Redis).
+    console.error('⚠️ Error inesperado durante el arranque, iniciando en modo degradado:', err);
+    startServer();
   });
 
   // ─── Graceful shutdown ─────────────────────────────────────────────────
@@ -153,7 +167,10 @@ if (!env.IS_VERCEL && env.NODE_ENV !== 'test') {
     stopAlertChecker();
     server.close(() => {
       console.log('HTTP server closed.');
-      process.exit(0);
+      // Cerrar conexiones externas para no dejar handles abiertos en cada deploy
+      Promise.allSettled([closeRedis(), mongoose.disconnect()]).finally(() => {
+        process.exit(0);
+      });
     });
     // Force exit after 10s if connections refuse to close
     setTimeout(() => {

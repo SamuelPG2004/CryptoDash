@@ -34,16 +34,14 @@ class CryptoTableErrorBoundary extends React.Component<Props, State> {
         this.handleReset = this.handleReset.bind(this);
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    static getDerivedStateFromError(error: any): State {
+    static getDerivedStateFromError(error: unknown): State {
         return {
             hasError:     true,
-            errorMessage: (error as Error)?.message ?? 'Error desconocido',
+            errorMessage: error instanceof Error ? error.message : 'Error desconocido',
         };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    componentDidCatch(error: any, info: React.ErrorInfo): void {
+    componentDidCatch(error: unknown, info: React.ErrorInfo): void {
         console.error('[CryptoTableErrorBoundary] Error capturado:', error, info.componentStack);
     }
 

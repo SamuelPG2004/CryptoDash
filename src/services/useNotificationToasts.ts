@@ -1,20 +1,22 @@
 import { useEffect } from 'react';
 import { useToast } from '../context/ToastContext';
+import type { AlertNotification, TransactionNotification } from './socket';
 
 export function useNotificationToasts() {
   const { showToast } = useToast();
 
   useEffect(() => {
-    const handleAlert = (e: any) => {
-      const { symbol, condition, targetPrice, currentPrice } = e.detail;
+    const handleAlert = (e: Event) => {
+      const { symbol, condition, targetPrice, currentPrice } =
+        (e as CustomEvent<AlertNotification>).detail;
       showToast(
         `Alerta: ${symbol} ${condition === 'above' ? '≥' : '≤'} $${targetPrice} (actual: $${currentPrice})`,
         'info',
         6000
       );
     };
-    const handleTransaction = (e: any) => {
-      const { type, transaction } = e.detail;
+    const handleTransaction = (e: Event) => {
+      const { type, transaction } = (e as CustomEvent<TransactionNotification>).detail;
       showToast(
         `Transacción: ${type === 'buy' ? 'Compra' : 'Venta'} de ${transaction.amount} ${transaction.symbol} a $${transaction.price}`,
         type === 'buy' ? 'success' : 'warning',

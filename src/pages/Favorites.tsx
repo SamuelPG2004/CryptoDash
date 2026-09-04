@@ -7,8 +7,17 @@ import { Star } from 'lucide-react';
 const Favorites: React.FC = () => {
   const { user, loading } = useAuth();
 
-  if (loading) return null;
-  if (!user) return <Navigate to="/login" />;
+  if (loading) {
+    // Skeleton en lugar de pantalla en blanco mientras se verifica la sesión
+    return (
+      <div className="max-w-7xl mx-auto px-4 py-8 animate-pulse">
+        <div className="h-6 w-32 bg-zinc-800 rounded mb-6" />
+        <div className="h-16 w-80 bg-zinc-800 rounded mb-12" />
+        <div className="h-96 bg-zinc-900 border border-zinc-800 rounded-3xl" />
+      </div>
+    );
+  }
+  if (!user) return <Navigate to="/login" replace />;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">

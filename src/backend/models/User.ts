@@ -143,6 +143,10 @@ userSchema.index({ 'alerts.coinId': 1 });
 // Índice para búsquedas de portfolio en buy/sell (O(log n))
 userSchema.index({ 'portfolio.coinId': 1 });
 
+// Índice sparse para el flujo de reset de contraseña — sin él, cada intento
+// de reset provocaba un full collection scan (vector barato de DoS).
+userSchema.index({ resetPasswordToken: 1 }, { sparse: true });
+
 // ─── Modelo ───────────────────────────────────────────────────────────────────
 
 const User: Model<IUser> = mongoose.model<IUser>('User', userSchema);

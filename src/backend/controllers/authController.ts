@@ -6,6 +6,10 @@ import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 import { sendEmail, escapeHtml } from '../services/emailService.js';
 
+/** Extrae un mensaje legible de un error desconocido sin recurrir a `any` */
+const errMsg = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 /**
  * POST /api/auth/register
  * Creates a new user account. Input is pre-validated by Zod middleware.
@@ -16,7 +20,8 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
   try {
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ message: 'El usuario ya existe' });
+      // 409 Conflict: el recurso ya existe — semánticamente correcto vs. 400
+      return res.status(409).json({ message: 'El usuario ya existe' });
     }
 
     const user = await User.create({
@@ -54,8 +59,8 @@ export const register = async (req: Request, res: Response, next: NextFunction) 
       favorites: user.favorites,
       wallet: user.wallet,
     });
-  } catch (error: any) {
-    logger.error('Register error', { error: error.message });
+  } catch (error) {
+    logger.error('Register error', { error: errMsg(error) });
     next(error);
   }
 };
@@ -68,15 +73,16 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
   const { email, password } = req.body;
 
   try {
-    const user: any = await User.findOne({ email });
+    const user = await User.findOne({ email });
     if (!user) {
-      return res.status(400).json({ message: 'Credenciales inválidas' });
+      // 401 y mensaje idéntico al de contraseña incorrecta — evita enumeración de cuentas
+      return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       logger.audit('LOGIN_FAILED', 'unknown', { email, reason: 'bad_password' });
-      return res.status(400).json({ message: 'Credenciales inválidas' });
+      return res.status(401).json({ message: 'Credenciales inválidas' });
     }
 
     const token = jwt.sign(
@@ -100,8 +106,8 @@ export const login = async (req: Request, res: Response, next: NextFunction) => 
       favorites: user.favorites,
       wallet: user.wallet,
     });
-  } catch (error: any) {
-    logger.error('Login error', { error: error.message });
+  } catch (error) {
+    logger.error('Login error', { error: errMsg(error) });
     next(error);
   }
 };
@@ -149,8 +155,8 @@ export const forgotPassword = async (req: Request, res: Response, next: NextFunc
 
     logger.audit('PASSWORD_RESET_REQUESTED', user._id.toString(), { email: user.email });
     res.json(genericResponse);
-  } catch (error: any) {
-    logger.error('Forgot password error', { error: error.message });
+  } catch (error) {
+    logger.error('Forgot password error', { error: errMsg(error) });
     next(error);
   }
 };
@@ -180,8 +186,8 @@ export const resetPassword = async (req: Request, res: Response, next: NextFunct
 
     logger.audit('PASSWORD_RESET_COMPLETED', user._id.toString(), { email: user.email });
     res.json({ message: 'Contraseña actualizada correctamente. Ya puedes iniciar sesión.' });
-  } catch (error: any) {
-    logger.error('Reset password error', { error: error.message });
+  } catch (error) {
+    logger.error('Reset password error', { error: errMsg(error) });
     next(error);
   }
 };

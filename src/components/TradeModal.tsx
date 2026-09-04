@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { isAxiosError } from 'axios';
 import { X, TrendingUp, TrendingDown, AlertCircle, CheckCircle2, Wallet } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { CoinLogo } from './CoinLogo';
@@ -35,7 +36,10 @@ const TradeModal: React.FC<TradeModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Depender de coin.id (no del objeto coin): el polling de precios crea un
+  // objeto nuevo cada ciclo y borraría el formulario mientras el usuario escribe.
   useEffect(() => {
     if (isOpen) {
       setAmount('');
@@ -43,7 +47,14 @@ const TradeModal: React.FC<TradeModalProps> = ({
       setSuccess('');
       setLoading(false);
     }
-  }, [isOpen, type, coin]);
+  }, [isOpen, type, coin.id]);
+
+  // Cancela el auto-cierre pendiente si el modal se desmonta antes
+  useEffect(() => {
+    return () => {
+      if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    };
+  }, []);
 
   if (!isOpen) return null;
 
@@ -76,11 +87,14 @@ const TradeModal: React.FC<TradeModalProps> = ({
     try {
       await onConfirm(numAmount);
       setSuccess(isBuy ? `Compraste ${numAmount} ${coin.symbol} exitosamente` : `Vendiste ${numAmount} ${coin.symbol} exitosamente`);
-      setTimeout(() => {
+      closeTimerRef.current = setTimeout(() => {
         onClose();
       }, 1800);
-    } catch (err: any) {
-      setError(err?.response?.data?.message || 'Error en la operación. Inténtalo de nuevo.');
+    } catch (err) {
+      const serverMessage = isAxiosError(err)
+        ? (err.response?.data as { message?: string } | undefined)?.message
+        : undefined;
+      setError(serverMessage || 'Error en la operación. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }

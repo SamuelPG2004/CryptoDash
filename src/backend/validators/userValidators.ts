@@ -21,3 +21,14 @@ export const validatePinSchema = z.object({
 export const toggleFavoriteSchema = z.object({
     cryptoId: z.string().min(1, 'ID de criptomoneda requerido'),
 });
+
+/**
+ * Alerta de precio. Era el único endpoint de escritura sin validación Zod:
+ * un cliente podía inyectar strings ilimitados o precios negativos/Infinity.
+ */
+export const addAlertSchema = z.object({
+    coinId:      z.string().min(1).max(100, 'ID de moneda inválido'),
+    symbol:      z.string().min(1).max(20, 'Símbolo inválido'),
+    condition:   z.enum(['above', 'below']),
+    targetPrice: z.number().positive('El precio objetivo debe ser mayor que 0').finite(),
+});

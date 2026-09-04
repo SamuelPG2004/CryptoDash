@@ -21,8 +21,10 @@ export async function initRedis(): Promise<void> {
             }
         });
 
-        redisClient.on('connect', () => {
-            logger.info('[Redis] Connected successfully.');
+        // 'ready' (no 'connect'): en 'connect' el socket existe pero el cliente
+        // aún no acepta comandos — marcarlo disponible antes de tiempo encolaba requests.
+        redisClient.on('ready', () => {
+            logger.info('[Redis] Connected and ready.');
             isRedisConnected = true;
         });
 
@@ -32,8 +34,9 @@ export async function initRedis(): Promise<void> {
         });
 
         await redisClient.connect();
-    } catch (error: any) {
-        logger.error('[Redis] Failed to initialize. Running in Fallback Mode (L1 Cache Only).', { error: error.message });
+    } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.error('[Redis] Failed to initialize. Running in Fallback Mode (L1 Cache Only).', { error: message });
         redisClient = null;
         isRedisConnected = false;
     }
@@ -41,4 +44,18 @@ export async function initRedis(): Promise<void> {
 
 export function getRedisClient(): RedisClientType | null {
     return isRedisConnected ? redisClient : null;
+}
+
+/** Cierra la conexión de Redis limpiamente (usado en el graceful shutdown). */
+export async function closeRedis(): Promise<void> {
+    if (redisClient) {
+        try {
+            await redisClient.quit();
+        } catch {
+            // Si quit falla (conexión ya caída), forzar el cierre del socket
+            redisClient.destroy();
+        }
+        redisClient = null;
+        isRedisConnected = false;
+    }
 }

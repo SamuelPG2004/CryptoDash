@@ -45,9 +45,11 @@ import {
 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { Navigate } from 'react-router-dom';
 
 import { cn } from '../lib/cn';
 import { COUNTRIES } from '../constants';
+import { useAuth } from '../context/AuthContext';
 import { useUserProfile } from '../hooks/useUserProfile';
 import { useTransactionHistory } from '../hooks/useTransactionHistory';
 import { usePortfolioMetrics } from '../hooks/usePortfolioMetrics';
@@ -658,8 +660,15 @@ type ModalType = 'edit' | 'password' | null;
  *  - Historial de transacciones paginado
  *  - Modales de acciones de seguridad
  */
+/**
+ * Array vacío estable a nivel de módulo: pasar `?? []` inline crearía un array
+ * nuevo por render e invalidaría el useMemo interno de usePortfolioMetrics.
+ */
+const EMPTY_PORTFOLIO: PortfolioItem[] = [];
+
 const Profile: React.FC = () => {
     // ── Datos ─────────────────────────────────────────────────────────────────
+    const { user, loading: authLoading } = useAuth();
     const {
         profile,
         loading,
@@ -669,7 +678,11 @@ const Profile: React.FC = () => {
         removeAlert,
     } = useUserProfile();
 
-    const metrics = usePortfolioMetrics(profile?.portfolio ?? []);
+    const metrics = usePortfolioMetrics(profile?.portfolio ?? EMPTY_PORTFOLIO);
+
+    // Alertas visibles: el guard de "sin alertas" debe evaluarse sobre las
+    // activas — con solo alertas inactivas antes se renderizaba una caja vacía.
+    const activeAlerts = profile?.alerts?.filter(a => a.active) ?? [];
 
     // ── Estado local de UI ────────────────────────────────────────────────────
     const [activeModal, setActiveModal] = useState<ModalType>(null);
@@ -677,9 +690,12 @@ const Profile: React.FC = () => {
     const openModal  = useCallback((type: NonNullable<ModalType>) => setActiveModal(type), []);
     const closeModal = useCallback(() => setActiveModal(null), []);
 
+    // ── Guard de ruta: visitantes anónimos van directo a /login ──────────────
+    if (!authLoading && !user) return <Navigate to="/login" replace />;
+
     // ── Estados de carga/error ────────────────────────────────────────────────
 
-    if (loading) {
+    if (authLoading || loading) {
         return (
             <div className="min-h-[calc(100vh-64px)] p-4 sm:p-8 bg-zinc-950">
                 <div className="max-w-4xl mx-auto space-y-8">
@@ -793,8 +809,8 @@ const Profile: React.FC = () => {
 
                     {/* Tarjetas de activos */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 relative z-10">
-                        {profile.portfolio.length > 0 ? (
-                            profile.portfolio.map(item => (
+                        {(profile.portfolio ?? []).length > 0 ? (
+                            (profile.portfolio ?? []).map(item => (
                                 <PortfolioCard key={item.coinId} item={item} />
                             ))
                         ) : (
@@ -857,12 +873,10 @@ const Profile: React.FC = () => {
                         <Bell className="text-emerald-500" size={20} /> Mis Alertas de Precio
                     </h3>
                     <div className="space-y-3">
-                        {profile.alerts.length > 0 ? (
-                            profile.alerts
-                                .filter(a => a.active)
-                                .map(alert => (
-                                    <AlertRow key={alert.id} alert={alert} onRemove={removeAlert} />
-                                ))
+                        {activeAlerts.length > 0 ? (
+                            activeAlerts.map(alert => (
+                                <AlertRow key={alert.id} alert={alert} onRemove={removeAlert} />
+                            ))
                         ) : (
                             <div className="py-10 text-center bg-zinc-950/30 border-2 border-zinc-800 border-dashed rounded-2xl">
                                 <p className="text-zinc-500 text-sm italic">

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 export type ToastType = 'success' | 'error' | 'info' | 'warning';
 
@@ -20,18 +20,25 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
-  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 4000) => {
-    const id = Math.random().toString(36).substr(2, 9);
-    setToasts((prev) => [...prev, { id, message, type, duration }]);
-    setTimeout(() => removeToast(id), duration);
-  }, []);
-
   const removeToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  const showToast = useCallback((message: string, type: ToastType = 'info', duration = 4000) => {
+    const id = crypto.randomUUID();
+    setToasts((prev) => [...prev, { id, message, type, duration }]);
+    setTimeout(() => removeToast(id), duration);
+  }, [removeToast]);
+
+  // useMemo: sin esto, cada render del provider crea un objeto nuevo y
+  // fuerza el re-render de TODOS los consumidores del contexto.
+  const value = useMemo(
+    () => ({ toasts, showToast, removeToast }),
+    [toasts, showToast, removeToast],
+  );
+
   return (
-    <ToastContext.Provider value={{ toasts, showToast, removeToast }}>
+    <ToastContext.Provider value={value}>
       {children}
     </ToastContext.Provider>
   );

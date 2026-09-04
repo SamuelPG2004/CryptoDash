@@ -76,8 +76,12 @@ api.interceptors.response.use(
     (error: AxiosError): Promise<never> => {
         const status = error.response?.status;
 
+        // Un 401 en los endpoints de auth significa "credenciales incorrectas",
+        // no "sesión expirada" — el formulario muestra el error, sin redirect global.
+        const isAuthEndpoint = error.config?.url?.startsWith('/auth/') ?? false;
+
         // ── 401 Unauthorized — Sesión expirada o token inválido ─────────────
-        if (status === 401 && !isHandlingUnauthorized) {
+        if (status === 401 && !isAuthEndpoint && !isHandlingUnauthorized) {
             isHandlingUnauthorized = true;
 
             // 1. Limpiar el token del storage (única fuente de verdad)

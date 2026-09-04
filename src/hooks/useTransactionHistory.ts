@@ -129,10 +129,7 @@ export function useTransactionHistory(): UseTransactionHistoryReturn {
 
     /** Navega a una página (con bounds checking) */
     const setPage = useCallback((newPage: number): void => {
-        setPageState(prev => {
-            const bounded = Math.max(1, Math.min(newPage, totalPages));
-            return bounded;
-        });
+        setPageState(Math.max(1, Math.min(newPage, totalPages)));
     }, [totalPages]);
 
     /** Fuerza recarga incrementando el key */

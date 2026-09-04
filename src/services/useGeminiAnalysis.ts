@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { isAxiosError } from 'axios';
 import api from './api';
 
 // ─── Types (mirrored from geminiService.ts) ────────────────────────────────
@@ -57,9 +58,11 @@ export function useGeminiAnalysis(): UseGeminiAnalysisReturn {
                 }
             );
             setResult(responseData);
-        } catch (err: any) {
-            const status  = err.response?.status;
-            const message = err.response?.data?.message;
+        } catch (err) {
+            const status  = isAxiosError(err) ? err.response?.status : undefined;
+            const message = isAxiosError(err)
+                ? (err.response?.data as { message?: string } | undefined)?.message
+                : undefined;
 
             if (status === 429) {
                 setError('Demasiadas solicitudes. Espera un momento antes de analizar de nuevo.');

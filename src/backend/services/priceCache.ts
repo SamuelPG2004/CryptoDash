@@ -24,88 +24,119 @@ interface CachedCoin {
   sparkline: number[];
 }
 
+/** Forma cruda de un item de /coins/markets de CoinGecko (solo los campos usados) */
+interface CoinGeckoMarketItem {
+  id?: string;
+  symbol?: string;
+  name?: string;
+  current_price?: number;
+  price_change_percentage_24h?: number;
+  image?: string;
+  sparkline_in_7d?: { price?: number[] };
+}
+
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+const REDIS_KEY = 'crypto_prices';
 
 let cachedCoins: CachedCoin[] = [];
 let lastFetchTime = 0;
-let isFetching = false;
+// Deduplica fetches concurrentes: todas las requests esperan la misma promesa
+// en lugar de recibir una cache vacía mientras otra request refresca.
+let inflightRefresh: Promise<void> | null = null;
 
 const COINGECKO_URL =
   'https://api.coingecko.com/api/v3/coins/markets' +
   '?vs_currency=usd&order=market_cap_desc&per_page=50&page=1&sparkline=true&price_change_percentage=24h';
 
+const isL1Fresh = (): boolean =>
+  cachedCoins.length > 0 && Date.now() - lastFetchTime <= CACHE_DURATION;
+
 /**
  * Fetches fresh market data from CoinGecko and populates the shared cache.
- * Prevents concurrent fetches with a simple flag.
+ * Concurrent callers share the same in-flight request.
  */
-export async function refreshPriceCache(): Promise<void> {
-  if (isFetching) return;
-  isFetching = true;
+export function refreshPriceCache(): Promise<void> {
+  if (inflightRefresh) return inflightRefresh;
 
-  try {
-    const { data } = await axios.get(COINGECKO_URL, {
-      timeout: 4500,
-      headers: {
-        Accept: 'application/json',
-        'User-Agent': 'CryptoDash/1.0 (educational project)',
-      },
-    });
+  inflightRefresh = (async () => {
+    try {
+      const { data } = await axios.get<CoinGeckoMarketItem[]>(COINGECKO_URL, {
+        timeout: 4500,
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'CryptoDash/1.0 (educational project)',
+        },
+      });
 
-    cachedCoins = data
-      .filter((coin: any) => coin?.id && coin.symbol)
-      .map((coin: any) => ({
-        id: coin.id,
-        symbol: coin.symbol.toUpperCase(),
-        name: coin.name || coin.id,
-        price: coin.current_price || 0,
-        change: coin.price_change_percentage_24h || 0,
-        image: coin.image || '',
-        sparkline: coin.sparkline_in_7d?.price || [],
-      }));
+      cachedCoins = data
+        .filter((coin): coin is CoinGeckoMarketItem & { id: string; symbol: string } =>
+          Boolean(coin?.id && coin.symbol))
+        .map((coin) => ({
+          id: coin.id,
+          symbol: coin.symbol.toUpperCase(),
+          name: coin.name || coin.id,
+          price: coin.current_price || 0,
+          change: coin.price_change_percentage_24h || 0,
+          image: coin.image || '',
+          sparkline: coin.sparkline_in_7d?.price || [],
+        }));
 
-    lastFetchTime = Date.now();
-    logger.info(`[PriceCache] Refreshed — ${cachedCoins.length} coins cached (L1)`);
+      lastFetchTime = Date.now();
+      logger.info(`[PriceCache] Refreshed — ${cachedCoins.length} coins cached (L1)`);
 
-    const redis = getRedisClient();
-    if (redis) {
-      // Guardar en Redis (L2 Cache)
-      await redis.set('crypto_prices', JSON.stringify({
-        timestamp: lastFetchTime,
-        data: cachedCoins
-      }), { EX: 300 }); // Expira en 5 minutos
-      logger.info(`[PriceCache] Saved to Redis (L2)`);
+      const redis = getRedisClient();
+      if (redis) {
+        // Guardar en Redis (L2 Cache)
+        await redis.set(REDIS_KEY, JSON.stringify({
+          timestamp: lastFetchTime,
+          data: cachedCoins
+        }), { EX: 300 }); // Expira en 5 minutos
+        logger.info(`[PriceCache] Saved to Redis (L2)`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn('[PriceCache] CoinGecko fetch failed, keeping stale cache', { error: message });
+    } finally {
+      inflightRefresh = null;
     }
-  } catch (err: any) {
-    logger.warn('[PriceCache] CoinGecko fetch failed, keeping stale cache', { error: err.message });
-  } finally {
-    isFetching = false;
-  }
+  })();
+
+  return inflightRefresh;
 }
 
 /**
  * Returns the entire cached coin list, refreshing if stale.
  * Used by cryptoRoutes to serve the frontend.
+ *
+ * Orden de lectura (optimizado para respuesta <200ms):
+ *  1. L1 (memoria) si está fresca — 0 saltos de red.
+ *  2. L2 (Redis) — rehidrata la L1 para que las siguientes lecturas sean locales.
+ *  3. CoinGecko (refresh) — puebla L1 y L2.
+ *  4. Si todo falla, devuelve la L1 obsoleta (mejor stale que vacío en plena demo).
  */
 export async function getCachedPrices(): Promise<CachedCoin[]> {
+  if (isL1Fresh()) return cachedCoins;
+
   const redis = getRedisClient();
   if (redis) {
     try {
-      const cached = await redis.get('crypto_prices');
-      if (cached) {
-        const parsed = JSON.parse(cached as string);
-        // Usar los datos de Redis si existen
-        return parsed.data;
+      const cached = await redis.get(REDIS_KEY);
+      if (typeof cached === 'string' && cached.length > 0) {
+        const parsed = JSON.parse(cached) as { timestamp?: number; data?: CachedCoin[] };
+        if (Array.isArray(parsed.data) && parsed.data.length > 0) {
+          // Rehidratar L1 desde Redis — las próximas lecturas no pagan el salto de red
+          cachedCoins = parsed.data;
+          lastFetchTime = parsed.timestamp ?? Date.now();
+          return cachedCoins;
+        }
       }
-    } catch (err: any) {
-      logger.warn('[PriceCache] Failed to read from Redis, falling back to L1', { error: err.message });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      logger.warn('[PriceCache] Failed to read from Redis, falling back to L1', { error: message });
     }
   }
 
-  // Fallback a la memoria L1
-  const stale = Date.now() - lastFetchTime > CACHE_DURATION;
-  if (stale || cachedCoins.length === 0) {
-    await refreshPriceCache();
-  }
+  await refreshPriceCache();
   return cachedCoins;
 }
 

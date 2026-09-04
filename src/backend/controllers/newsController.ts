@@ -51,7 +51,15 @@ interface NewsItem {
 
 const RSS_FEED_URL   = 'https://cointelegraph.com/rss/tag/bitcoin';
 const RSS_ITEM_LIMIT = 10;
-const rssParser      = new Parser();
+// timeout de 5s: el default de rss-parser (60s) dejaba requests colgadas
+// un minuto entero si CoinTelegraph no respondía.
+const rssParser      = new Parser({ timeout: 5_000 });
+
+// ─── Cache del feed RSS ───────────────────────────────────────────────────────
+// Sin cache, cada request del frontend disparaba una llamada saliente a
+// CoinTelegraph (riesgo de baneo de IP y latencias de segundos).
+const NEWS_CACHE_TTL_MS = 5 * 60 * 1000;
+let newsCache: { items: NewsItem[]; fetchedAt: number } | null = null;
 
 // ─── Funciones puras auxiliares ───────────────────────────────────────────────
 
@@ -152,14 +160,30 @@ function resolveAiError(err: AiProviderError, context: string): AppError {
  * @param res  - Response de Express
  */
 export const getNewsFeed = async (_req: Request, res: Response): Promise<void> => {
+    // 1. Cache fresca → respuesta inmediata sin salir a internet
+    if (newsCache && Date.now() - newsCache.fetchedAt < NEWS_CACHE_TTL_MS) {
+        res.set('Cache-Control', 'public, max-age=60');
+        res.json(newsCache.items);
+        return;
+    }
+
     try {
         const feed  = await rssParser.parseURL(RSS_FEED_URL);
         const news  = feed.items.slice(0, RSS_ITEM_LIMIT).map(mapFeedItem);
+        newsCache   = { items: news, fetchedAt: Date.now() };
+        res.set('Cache-Control', 'public, max-age=60');
         res.json(news);
     } catch (error: unknown) {
         const message = error instanceof Error ? error.message : String(error);
         logger.error('newsController: error al obtener feed RSS', { error: message });
-        // Fallback silencioso — el cliente recibe datos de demo en lugar de un error 500
+        // 2. Feed caído pero hay cache antigua → mejor stale que mock
+        if (newsCache) {
+            res.set('X-Data-Source', 'stale-cache');
+            res.json(newsCache.items);
+            return;
+        }
+        // 3. Fallback final — el cliente recibe datos de demo en lugar de un error 500
+        res.set('X-Data-Source', 'mock');
         res.json(buildMockNews());
     }
 };

@@ -135,6 +135,23 @@ function emitTransactionNotification(
     }
 }
 
+/**
+ * Detecta errores transitorios de transacción de MongoDB (WriteConflict,
+ * elección de primario, etc.). El driver los marca con el label
+ * `TransientTransactionError` y la operación completa es segura de reintentar.
+ */
+function isTransientTxnError(err: unknown): boolean {
+    return (
+        typeof err === 'object' &&
+        err !== null &&
+        Array.isArray((err as { errorLabels?: unknown }).errorLabels) &&
+        ((err as { errorLabels: string[] }).errorLabels).includes('TransientTransactionError')
+    );
+}
+
+/** Reintentos máximos ante errores transitorios de transacción */
+const MAX_TXN_RETRIES = 2;
+
 // ─── Lógica de negocio de compra ──────────────────────────────────────────────
 
 /**
@@ -156,7 +173,7 @@ function emitTransactionNotification(
  * @throws {AppError} 400 — Saldo insuficiente o usuario no encontrado
  * @throws {AppError} 500 — Error interno de base de datos
  */
-export async function executeBuy(params: BuyParams): Promise<TradeResult> {
+export async function executeBuy(params: BuyParams, attempt = 0): Promise<TradeResult> {
     const { userId, coinId, symbol, name, amount, io } = params;
 
     // ── 1. Verificar precio en caché del servidor ──────────────────────────
@@ -172,6 +189,9 @@ export async function executeBuy(params: BuyParams): Promise<TradeResult> {
 
     // ── 2. Abrir sesión ACID de MongoDB ────────────────────────────────────
     const session = await mongoose.startSession();
+    // Solo se puede abortar ANTES del commit: un fallo post-commit (socket,
+    // audit log) no debe intentar el rollback de una transacción ya confirmada.
+    let committed = false;
 
     try {
         session.startTransaction({
@@ -187,7 +207,7 @@ export async function executeBuy(params: BuyParams): Promise<TradeResult> {
         const userAfterDeduction = await User.findOneAndUpdate(
             { _id: userId, wallet: { $gte: totalCost } },
             { $inc: { wallet: -totalCost } },
-            { new: true, session },
+            { returnDocument: 'after', session },  // 'new' está deprecado en Mongoose 9
         );
 
         if (!userAfterDeduction) {
@@ -238,6 +258,7 @@ export async function executeBuy(params: BuyParams): Promise<TradeResult> {
 
         // ── 6. Commit atómico — todo o nada ───────────────────────────────
         await session.commitTransaction();
+        committed = true;
 
         // ── Post-commit: notificaciones y auditoría (fuera de la sesión) ──
         if (io) {
@@ -261,10 +282,20 @@ export async function executeBuy(params: BuyParams): Promise<TradeResult> {
         return { user: safeUser, transaction };
 
     } catch (err: unknown) {
-        // ── Rollback completo ante cualquier error ─────────────────────────
-        await session.abortTransaction();
+        // ── Rollback completo ante cualquier error (solo si no hubo commit) ─
+        if (!committed) {
+            await session.abortTransaction().catch(() => { /* sesión ya cerrada */ });
+        }
 
-        logger.error('transactionService.executeBuy: abortTransaction ejecutado', {
+        // Error transitorio (WriteConflict, etc.) → reintentar la operación completa
+        if (!committed && isTransientTxnError(err) && attempt < MAX_TXN_RETRIES) {
+            logger.warn('transactionService.executeBuy: error transitorio, reintentando', {
+                userId, coinId, attempt: attempt + 1,
+            });
+            return executeBuy(params, attempt + 1);
+        }
+
+        logger.error('transactionService.executeBuy: error en la operación', {
             userId,
             coinId,
             amount,
@@ -304,7 +335,7 @@ export async function executeBuy(params: BuyParams): Promise<TradeResult> {
  * @throws {AppError} 400 — Holdings insuficientes
  * @throws {AppError} 500 — Error interno de base de datos
  */
-export async function executeSell(params: SellParams): Promise<TradeResult> {
+export async function executeSell(params: SellParams, attempt = 0): Promise<TradeResult> {
     const { userId, coinId, symbol: reqSymbol, name, amount, io } = params;
 
     // ── 1. Verificar precio en caché del servidor ──────────────────────────
@@ -320,6 +351,7 @@ export async function executeSell(params: SellParams): Promise<TradeResult> {
 
     // ── 2. Abrir sesión ACID de MongoDB ────────────────────────────────────
     const session = await mongoose.startSession();
+    let committed = false;
 
     try {
         session.startTransaction({
@@ -355,8 +387,11 @@ export async function executeSell(params: SellParams): Promise<TradeResult> {
         user.wallet += totalEarnings;
         user.portfolio[itemIndex].amount -= amount;
 
-        // Si se vendió todo, eliminar la entrada del portfolio
-        if (user.portfolio[itemIndex].amount === 0) {
+        // Si se vendió todo, eliminar la entrada del portfolio.
+        // Umbral epsilon en lugar de === 0: la aritmética de floats deja
+        // residuos (~1e-17) al vender la posición completa, y un residuo
+        // negativo violaría el `min: 0` del esquema haciendo fallar el save.
+        if (user.portfolio[itemIndex].amount <= 1e-12) {
             user.portfolio.splice(itemIndex, 1);
         }
 
@@ -379,6 +414,7 @@ export async function executeSell(params: SellParams): Promise<TradeResult> {
 
         // ── 6. Commit atómico ──────────────────────────────────────────────
         await session.commitTransaction();
+        committed = true;
 
         // ── Post-commit: notificaciones y auditoría ────────────────────────
         if (io) {
@@ -401,10 +437,19 @@ export async function executeSell(params: SellParams): Promise<TradeResult> {
         return { user: safeUser, transaction };
 
     } catch (err: unknown) {
-        // ── Rollback completo ──────────────────────────────────────────────
-        await session.abortTransaction();
+        // ── Rollback completo (solo si no hubo commit) ─────────────────────
+        if (!committed) {
+            await session.abortTransaction().catch(() => { /* sesión ya cerrada */ });
+        }
 
-        logger.error('transactionService.executeSell: abortTransaction ejecutado', {
+        if (!committed && isTransientTxnError(err) && attempt < MAX_TXN_RETRIES) {
+            logger.warn('transactionService.executeSell: error transitorio, reintentando', {
+                userId, coinId, attempt: attempt + 1,
+            });
+            return executeSell(params, attempt + 1);
+        }
+
+        logger.error('transactionService.executeSell: error en la operación', {
             userId,
             coinId,
             amount,

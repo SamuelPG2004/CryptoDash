@@ -19,6 +19,7 @@
  */
 
 import express, { Request, Response } from 'express';
+import crypto from 'crypto';
 import { runAlertCheckCycle } from '../services/alertChecker.js';
 import { env } from '../config/env.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
@@ -26,17 +27,25 @@ import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 
+/** Comparación en tiempo constante — evita fugas de información por timing */
+const safeEquals = (a: string, b: string): boolean => {
+    const bufA = Buffer.from(a);
+    const bufB = Buffer.from(b);
+    return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+};
+
 // GET /api/internal/check-alerts — ejecuta un ciclo de verificación de alertas.
 // GET (y no POST) porque los Vercel Crons solo hacen requests GET.
 router.get('/check-alerts', asyncHandler(async (req: Request, res: Response) => {
-    if (env.NODE_ENV === 'production') {
-        if (!env.CRON_SECRET) {
-            logger.error('[Internal] CRON_SECRET no configurado — endpoint de cron deshabilitado');
-            return res.status(503).json({ status: 'error', message: 'Cron no configurado' });
-        }
-        if (req.headers.authorization !== `Bearer ${env.CRON_SECRET}`) {
+    // El secret se exige SIEMPRE que esté configurado (no solo en producción):
+    // un host desplegado sin NODE_ENV=production quedaba completamente abierto.
+    if (env.CRON_SECRET) {
+        if (!safeEquals(req.headers.authorization ?? '', `Bearer ${env.CRON_SECRET}`)) {
             return res.status(401).json({ status: 'error', message: 'No autorizado' });
         }
+    } else if (env.NODE_ENV === 'production') {
+        logger.error('[Internal] CRON_SECRET no configurado — endpoint de cron deshabilitado');
+        return res.status(503).json({ status: 'error', message: 'Cron no configurado' });
     }
 
     const stats = await runAlertCheckCycle(req.app.get('io'));

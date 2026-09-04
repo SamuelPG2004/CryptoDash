@@ -43,5 +43,12 @@ export function validateEnv(): void {
         console.warn('⚠️  GROQ_API_KEY not set — AI analysis will be unavailable');
     }
 
+    // APP_URL sin configurar en producción rompe CORS (solo permitiría
+    // localhost) y los enlaces de reset de contraseña apuntarían a localhost.
+    if (isProd && !process.env.APP_URL) {
+        console.error('❌  APP_URL not set in production — CORS and password-reset links will point to localhost');
+        missing.push('APP_URL');
+    }
+
     console.log(`✅ Environment: ${env.NODE_ENV} | Vercel: ${env.IS_VERCEL}`);
 }

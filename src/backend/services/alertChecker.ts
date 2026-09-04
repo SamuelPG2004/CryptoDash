@@ -165,7 +165,27 @@ export interface AlertCycleStats {
  *
  * @param io - Instancia de Socket.IO (opcional)
  */
+/**
+ * Guard de reentrada: un ciclo largo (muchos correos) puede superar el
+ * intervalo de 5 min, y el siguiente tick — o el cron de Vercel en paralelo —
+ * releería las mismas alertas activas y las dispararía por duplicado.
+ */
+let cycleInFlight = false;
+
 export async function runAlertCheckCycle(io?: SocketIOServer): Promise<AlertCycleStats> {
+    if (cycleInFlight) {
+        logger.warn('[AlertChecker] Ciclo anterior aún en ejecución — saltando este tick');
+        return { checked: 0, triggered: 0 };
+    }
+    cycleInFlight = true;
+    try {
+        return await runAlertCheckCycleInternal(io);
+    } finally {
+        cycleInFlight = false;
+    }
+}
+
+async function runAlertCheckCycleInternal(io?: SocketIOServer): Promise<AlertCycleStats> {
     // ── 1. Obtener precios del caché compartido ──────────────────────────────
     let priceMap: Map<string, number>;
     try {
@@ -200,7 +220,8 @@ export async function runAlertCheckCycle(io?: SocketIOServer): Promise<AlertCycl
 
     // ── 3. Verificar alertas de cada usuario ─────────────────────────────────
     for (const user of users) {
-        let userModified = false;
+        // Alertas disparadas en este ciclo — se notifican DESPUÉS de persistir
+        const triggered: Array<{ alert: IAlert; currentPrice: number }> = [];
 
         for (const alert of user.alerts) {
             if (!alert.active) continue;
@@ -211,11 +232,29 @@ export async function runAlertCheckCycle(io?: SocketIOServer): Promise<AlertCycl
 
             if (!isAlertTriggered(alert, currentPrice)) continue;
 
-            // ── Alerta disparada ─────────────────────────────────────────────
-            alert.active  = false;
-            userModified  = true;
-            totalTriggered++;
+            alert.active = false;
+            triggered.push({ alert, currentPrice });
+        }
 
+        if (triggered.length === 0) continue;
+
+        // ── Persistir ANTES de notificar ─────────────────────────────────────
+        // Si el proceso muere tras enviar correos pero antes de guardar, las
+        // alertas se re-dispararían en cada ciclo. Guardar primero garantiza
+        // "como máximo una notificación" en lugar de "al menos una infinitas veces".
+        try {
+            await user.save();
+        } catch (saveErr: unknown) {
+            logger.error('[AlertChecker] Error al guardar alertas disparadas — notificación pospuesta', {
+                userId: user._id.toString(),
+                error:  saveErr instanceof Error ? saveErr.message : String(saveErr),
+            });
+            continue;  // sin persistencia no notificamos: se reintentará el próximo ciclo
+        }
+
+        totalTriggered += triggered.length;
+
+        for (const { alert, currentPrice } of triggered) {
             logger.audit('ALERT_TRIGGERED', user._id.toString(), {
                 coinId:      alert.coinId,
                 symbol:      alert.symbol,
@@ -224,26 +263,17 @@ export async function runAlertCheckCycle(io?: SocketIOServer): Promise<AlertCycl
                 currentPrice,
             });
 
-            // ── Notificación WebSocket (post-mutación, pre-save) ─────────────
             if (io) {
                 emitAlertNotification(io, user._id.toString(), alert, currentPrice);
             }
-
-            // ── Notificación por correo — canal que sí funciona en serverless ─
-            await sendAlertEmail(user.email, user.fullName, alert, currentPrice);
         }
 
-        // Solo guarda el documento si algo cambió — reduce escrituras a MongoDB
-        if (userModified) {
-            try {
-                await user.save();
-            } catch (saveErr: unknown) {
-                logger.error('[AlertChecker] Error al guardar alertas disparadas', {
-                    userId: user._id.toString(),
-                    error:  saveErr instanceof Error ? saveErr.message : String(saveErr),
-                });
-            }
-        }
+        // Correos en paralelo (por usuario) — antes eran secuenciales y un
+        // ciclo con muchos usuarios superaba el intervalo de 5 minutos.
+        await Promise.allSettled(
+            triggered.map(({ alert, currentPrice }) =>
+                sendAlertEmail(user.email, user.fullName, alert, currentPrice)),
+        );
     }
 
     if (totalChecked > 0 || totalTriggered > 0) {

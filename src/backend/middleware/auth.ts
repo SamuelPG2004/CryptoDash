@@ -22,7 +22,8 @@ export const protect = (req: AuthRequest, res: Response, next: NextFunction) => 
   }
 
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET) as { id: string; email: string };
+    // `algorithms` fijado explícitamente: previene ataques de confusión de algoritmo
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] }) as { id: string; email: string };
     req.user = decoded;
     next();
   } catch (error) {

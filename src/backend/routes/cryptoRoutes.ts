@@ -27,14 +27,20 @@ router.get('/prices', async (_req, res) => {
     const prices = await getCachedPrices();
 
     if (prices.length > 0) {
+      // El dato solo cambia cada 5 min — permitir cache HTTP de 60s reduce
+      // la carga del servidor y da respuestas instantáneas en la demo.
+      res.set('Cache-Control', 'public, max-age=60');
       return res.json(prices);
     }
 
     // Cache empty after refresh attempt — return mock data so UI always shows something
     logger.warn('CoinGecko unavailable and cache empty, returning mock data');
+    res.set('X-Data-Source', 'mock');  // marcador para diagnóstico: datos de fallback
     res.json(MOCK_DATA);
-  } catch (error: any) {
-    logger.warn('CoinGecko fetch failed, using mock fallback', { error: error.message });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.warn('CoinGecko fetch failed, using mock fallback', { error: message });
+    res.set('X-Data-Source', 'mock');
     res.json(MOCK_DATA);
   }
 });

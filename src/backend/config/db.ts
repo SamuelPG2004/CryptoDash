@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
+import { Request, Response, NextFunction } from 'express';
 import { env } from './env.js';
-
-let isConnected = false;
 
 /**
  * Connects to MongoDB with optimizations for serverless (Vercel).
@@ -10,7 +9,6 @@ let isConnected = false;
  */
 export async function connectToDatabase(): Promise<void> {
     if (mongoose.connection.readyState === 1) {
-        isConnected = true;
         return;
     }
 
@@ -24,11 +22,13 @@ export async function connectToDatabase(): Promise<void> {
             socketTimeoutMS: 45000,
             maxPoolSize: env.IS_VERCEL ? 1 : 10,
         });
-        isConnected = true;
         console.log('✅ Connected to MongoDB successfully');
     } catch (err) {
-        isConnected = false;
-        console.error('❌ MongoDB connection error:', err);
+        // Solo nombre + mensaje: el error completo del driver puede incluir
+        // la connection string con credenciales.
+        const name    = err instanceof Error ? err.name : 'Error';
+        const message = err instanceof Error ? err.message.replace(/:([^@\s]+)@/, ':****@') : String(err);
+        console.error(`❌ MongoDB connection error: ${name} — ${message}`);
         throw err;
     }
 }
@@ -36,15 +36,16 @@ export async function connectToDatabase(): Promise<void> {
 /**
  * Express middleware that ensures a DB connection exists before processing the request.
  */
-export const requireDB = async (req: any, res: any, next: any) => {
+export const requireDB = async (_req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
         await connectToDatabase();
         next();
-    } catch (err: any) {
-        console.error('Failed to connect to database:', err);
-        res.status(500).json({
+    } catch (err) {
+        console.error('Failed to connect to database:', err instanceof Error ? err.message : String(err));
+        // 503 Service Unavailable: la dependencia (MongoDB) no responde, no es un bug del servidor
+        res.status(503).json({
             status: 'error',
-            message: 'No se pudo conectar a la base de datos',
+            message: 'Servicio temporalmente no disponible. Inténtalo de nuevo en unos segundos.',
         });
     }
 };

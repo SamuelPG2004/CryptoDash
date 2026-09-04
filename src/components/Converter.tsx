@@ -18,27 +18,31 @@ const Converter: React.FC = () => {
     const [fromCoin, setFromCoin] = useState('BTC');
     const [toCoin, setToCoin] = useState('USDT');
     const [refreshing, setRefreshing] = useState(false);
-
-    useEffect(() => {
-        fetchCoins();
-    }, []);
+    const [loadError, setLoadError] = useState(false);
 
     const fetchCoins = async () => {
         setRefreshing(true);
         try {
-            const { data } = await api.get('/crypto/prices');
-            setCoins(data.map((c: any) => ({
+            const { data } = await api.get<Coin[]>('/crypto/prices');
+            setCoins(data.map((c) => ({
                 id: c.id,
                 symbol: c.symbol,
                 name: c.name,
                 price: c.price,
             })));
-        } catch (err) {
-            setCoins([]);
+            setLoadError(false);
+        } catch {
+            // Conservar la lista anterior si existía; solo marcar el error
+            setLoadError(true);
         } finally {
             setRefreshing(false);
         }
     };
+
+    useEffect(() => {
+        fetchCoins();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const handleConvert = () => {
         const from = coins.find(c => c.symbol === fromCoin);
@@ -84,6 +88,8 @@ const Converter: React.FC = () => {
                         onChange={e => setFromCoin(e.target.value)}
                         className="bg-black text-gray-200 rounded-lg px-2 py-2 text-sm outline-none"
                     >
+                        {/* Placeholder mientras carga: evita el warning de <select> controlado sin opción coincidente */}
+                        {coins.length === 0 && <option value={fromCoin}>{fromCoin}</option>}
                         {coins.map(c => (
                             <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
                         ))}
@@ -107,6 +113,7 @@ const Converter: React.FC = () => {
                         onChange={e => setToCoin(e.target.value)}
                         className="bg-black text-gray-200 rounded-lg px-2 py-2 text-sm outline-none"
                     >
+                        {coins.length === 0 && <option value={toCoin}>{toCoin}</option>}
                         {coins.map(c => (
                             <option key={c.symbol} value={c.symbol}>{c.symbol}</option>
                         ))}
@@ -114,10 +121,18 @@ const Converter: React.FC = () => {
                 </div>
             </div>
 
+            {/* Error visible: sin esto el usuario vería dropdowns vacíos sin explicación */}
+            {loadError && coins.length === 0 && (
+                <p className="text-rose-400 text-xs font-bold mb-2" role="alert">
+                    No se pudieron cargar los precios. Pulsa actualizar para reintentar.
+                </p>
+            )}
+
             {/* Botón de convertir */}
             <button
                 onClick={handleConvert}
-                className="w-full mt-2 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all"
+                disabled={coins.length === 0}
+                className="w-full mt-2 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
                 Convertir
             </button>

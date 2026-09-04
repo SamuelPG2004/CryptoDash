@@ -69,10 +69,10 @@ describe('POST /api/auth/register', () => {
         expect(res.body.password).toBeUndefined();
     });
 
-    it('debe rechazar el registro con email duplicado → 400', async () => {
+    it('debe rechazar el registro con email duplicado → 409', async () => {
         await request(app).post('/api/auth/register').send(validRegisterPayload);
         const res = await request(app).post('/api/auth/register').send(validRegisterPayload);
-        expect(res.statusCode).toBe(400);
+        expect(res.statusCode).toBe(409);
         expect(res.body.message).toMatch(/ya existe/i);
     });
 
@@ -104,21 +104,21 @@ describe('POST /api/auth/login', () => {
         expect(res.body.token.split('.').length).toBe(3);  // JWT tiene 3 partes separadas por punto
     });
 
-    it('debe rechazar credenciales incorrectas → 400', async () => {
+    it('debe rechazar credenciales incorrectas → 401', async () => {
         const res = await request(app)
             .post('/api/auth/login')
             .send({ email: validRegisterPayload.email, password: 'WrongPassword!' });
 
-        expect(res.statusCode).toBe(400);
+        expect(res.statusCode).toBe(401);
         expect(res.body.message).toMatch(/credenciales/i);
     });
 
-    it('debe rechazar email no registrado → 400', async () => {
+    it('debe rechazar email no registrado → 401', async () => {
         const res = await request(app)
             .post('/api/auth/login')
             .send({ email: 'nobody@cryptodash.test', password: 'Password123!' });
 
-        expect(res.statusCode).toBe(400);
+        expect(res.statusCode).toBe(401);
     });
 });
 
@@ -193,7 +193,7 @@ describe('POST /api/auth/reset-password', () => {
         const oldLogin = await request(app)
             .post('/api/auth/login')
             .send({ email: validRegisterPayload.email, password: validRegisterPayload.password });
-        expect(oldLogin.statusCode).toBe(400);
+        expect(oldLogin.statusCode).toBe(401);
 
         // La nueva sí
         const newLogin = await request(app)

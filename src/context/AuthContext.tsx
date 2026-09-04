@@ -48,6 +48,7 @@ import React, {
     useContext,
     useEffect,
     useCallback,
+    useMemo,
     useRef,
 } from 'react';
 import api, { SESSION_EXPIRED_EVENT } from '../services/api';
@@ -213,9 +214,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
      */
     const login = useCallback(async (token: string): Promise<void> => {
         setToken(token);
-        // Cargar perfil desde el servidor para garantizar datos completos y frescos
-        const { data } = await api.get<SessionUser>('/users/profile');
-        setUser(data);
+        try {
+            // Cargar perfil desde el servidor para garantizar datos completos y frescos
+            const { data } = await api.get<SessionUser>('/users/profile');
+            setUser(data);
+        } catch (error) {
+            // Si la carga del perfil falla, no dejar un token huérfano persistido:
+            // quedaría un estado "semi-autenticado" que sobrevive al reload.
+            removeToken();
+            throw error;
+        }
     }, []);
 
     /**
@@ -246,14 +254,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // ── Valor del contexto ────────────────────────────────────────────────────
 
-    const contextValue: AuthContextType = {
-        user,
-        loading,
-        login,
-        logout,
-        updateFavorites,
-        updateUser,
-    };
+    // useMemo: sin esto, cada render del provider crearía un objeto nuevo y
+    // forzaría el re-render de todos los consumidores (Navbar, tablas, hooks...).
+    const contextValue: AuthContextType = useMemo(
+        () => ({ user, loading, login, logout, updateFavorites, updateUser }),
+        [user, loading, login, logout, updateFavorites, updateUser],
+    );
 
     return (
         <AuthContext.Provider value={contextValue}>

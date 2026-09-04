@@ -19,6 +19,7 @@ import {
   updatePasswordSchema,
   validatePinSchema,
   toggleFavoriteSchema,
+  addAlertSchema,
 } from '../validators/userValidators.js';
 import { buySchema, sellSchema } from '../validators/cryptoValidators.js';
 
@@ -37,7 +38,7 @@ router.post('/buy', protect, tradeLimiter, validate(buySchema), asyncHandler(buy
 router.post('/sell', protect, tradeLimiter, validate(sellSchema), asyncHandler(sellCrypto));
 
 // Alerts routes
-router.post('/alerts', protect, asyncHandler(addAlert));
+router.post('/alerts', protect, validate(addAlertSchema), asyncHandler(addAlert));
 router.delete('/alerts/:id', protect, asyncHandler(removeAlert));
 
 export default router;

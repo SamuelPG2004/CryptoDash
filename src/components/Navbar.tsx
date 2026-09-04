@@ -39,7 +39,7 @@ const Navbar: React.FC = () => {
               </Link>
               <div className="flex items-center gap-2 bg-zinc-900 px-3 py-1.5 rounded-full border border-zinc-800">
                 <Wallet size={16} className="text-emerald-500" />
-                <span className="text-sm font-mono">${user.wallet.toLocaleString()}</span>
+                <span className="text-sm font-mono">${(user.wallet ?? 0).toLocaleString()}</span>
               </div>
               <button
                 onClick={handleLogout}

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Toast, ToastType } from '../context/ToastContext';
+import type { Toast, ToastType } from '../context/ToastContext';
 
 const typeStyles: Record<ToastType, string> = {
   success: 'bg-emerald-600 text-white',

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Newspaper, ExternalLink, Clock, TrendingUp, TrendingDown } from 'lucide-react';
+import { Newspaper, ExternalLink, Clock, TrendingUp, TrendingDown, WifiOff } from 'lucide-react';
+import api from '../services/api';
 
 interface NewsItem {
     id: string;
@@ -13,30 +14,34 @@ interface NewsItem {
 const NewsPanel: React.FC = () => {
     const [news, setNews] = useState<NewsItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
 
     useEffect(() => {
+        // Flag de cancelación: evita setState sobre un componente desmontado
+        // y descarta respuestas que lleguen fuera de orden.
+        let cancelled = false;
+
         const fetchNews = async () => {
             try {
-                // To avoid causing dependency cycles, using fetch or api instance
-                const token = localStorage.getItem('token');
-                const headers: any = {};
-                if (token) headers['Authorization'] = `Bearer ${token}`;
-
-                const response = await fetch('/api/news/feed', { headers });
-                if (response.ok) {
-                    const data = await response.json();
+                // La instancia `api` inyecta el JWT desde tokenStorage automáticamente
+                const { data } = await api.get<NewsItem[]>('/news/feed');
+                if (!cancelled) {
                     setNews(data);
+                    setError(false);
                 }
-            } catch (error) {
-                console.error("Error fetching news:", error);
+            } catch {
+                if (!cancelled) setError(true);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
 
         fetchNews();
         const interval = setInterval(fetchNews, 5 * 60 * 1000); // refresh every 5 mins
-        return () => clearInterval(interval);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+        };
     }, []);
 
     return (
@@ -56,7 +61,26 @@ const NewsPanel: React.FC = () => {
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
                 {loading ? (
-                    <div className="text-center text-zinc-500 text-sm mt-10 animate-pulse">Cargando noticias reales...</div>
+                    // Skeleton de carga — evita el salto de layout al llegar los datos
+                    <>
+                        {[0, 1, 2, 3].map((i) => (
+                            <div key={i} className="p-4 bg-zinc-900/40 border border-zinc-800/50 rounded-2xl animate-pulse space-y-3">
+                                <div className="h-3 w-24 bg-zinc-800 rounded" />
+                                <div className="h-4 w-full bg-zinc-800 rounded" />
+                                <div className="h-4 w-2/3 bg-zinc-800 rounded" />
+                            </div>
+                        ))}
+                    </>
+                ) : error && news.length === 0 ? (
+                    <div className="flex flex-col items-center text-center text-zinc-500 text-sm mt-10 gap-2">
+                        <WifiOff size={24} className="text-zinc-600" />
+                        <p>No se pudieron cargar las noticias.</p>
+                        <p className="text-xs text-zinc-600">Se reintentará automáticamente.</p>
+                    </div>
+                ) : news.length === 0 ? (
+                    <div className="text-center text-zinc-500 text-sm mt-10">
+                        No hay noticias disponibles por ahora.
+                    </div>
                 ) : news.map((item) => (
                     <a
                         href={item.url}

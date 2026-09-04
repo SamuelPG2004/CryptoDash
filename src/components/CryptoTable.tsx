@@ -58,13 +58,13 @@ import {
 import { cn } from '../lib/cn';
 import { calculateSMA, calculateRSI } from '../lib/technicalIndicators';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { useGeminiAnalysis } from '../services/useGeminiAnalysis';
 import { useCryptoPrices } from '../hooks/useCryptoPrices';
 import { useCryptoActions } from '../hooks/useCryptoActions';
 import TradeModal from './TradeModal';
-import CryptoTableErrorBoundary from './CryptoTableErrorBoundary';
 import { CoinLogo } from './CoinLogo';
-import type { Crypto, ChartDataPoint, TechnicalIndicators, TradeModalState, PortfolioItem } from '../types/crypto';
+import type { Crypto, ChartDataPoint, TechnicalIndicators, TradeModalState } from '../types/crypto';
 
 // ─── Sub-componentes puros ─────────────────────────────────────────────────────
 
@@ -193,6 +193,7 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
     const { cryptos, loading, error }         = useCryptoPrices();
     const { executeTrade, toggleFavorite, createAlert } = useCryptoActions();
     const { user }                            = useAuth();
+    const { showToast }                       = useToast();
     const { result: aiAnalysis, loading: isAnalyzing, analyze: analyzeWithAI, error: aiError } = useGeminiAnalysis();
 
     // ── Estado local de UI ────────────────────────────────────────────────────
@@ -204,10 +205,11 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
     // ── Datos derivados con memoización ───────────────────────────────────────
 
     const filteredCryptos = useMemo<Crypto[]>(() => {
-        const base =
-            filterFavorites && user?.favorites?.length
-                ? cryptos.filter((c) => user.favorites.includes(c.id))
-                : cryptos;
+        // En modo favoritos SIEMPRE se filtra: con 0 favoritos la lista queda
+        // vacía y se muestra el empty state (antes caía a la lista completa).
+        const base = filterFavorites
+            ? cryptos.filter((c) => user?.favorites?.includes(c.id))
+            : cryptos;
 
         if (!searchTerm.trim()) return base;
 
@@ -241,9 +243,7 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
     // Cantidad de tokens del activo seleccionado en el portfolio del usuario
     const ownedAmount = useMemo<number>(() => {
         if (!user || !selectedCoin) return 0;
-        const item = (user as any).portfolio?.find(
-            (p: PortfolioItem) => p.coinId === selectedCoin.id
-        );
+        const item = user.portfolio?.find((p) => p.coinId === selectedCoin.id);
         return item?.amount ?? 0;
     }, [user, selectedCoin]);
 
@@ -276,19 +276,20 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
         try {
             await toggleFavorite(coinId);
         } catch {
-            console.error('[CryptoTable] Error al alternar favorito');
+            showToast('No se pudo actualizar el favorito. Inténtalo de nuevo.', 'error');
         }
-    }, [user, toggleFavorite]);
+    }, [user, toggleFavorite, showToast]);
 
     const handleCreateAlert = useCallback(async (targetPrice: number) => {
         if (!selectedCoin) return;
         try {
             await createAlert({ coin: selectedCoin, targetPrice });
             setShowAlertPanel(false);
+            showToast(`Alerta creada para ${selectedCoin.symbol} en $${targetPrice.toLocaleString()}`, 'success');
         } catch {
-            console.error('[CryptoTable] Error al crear alerta');
+            showToast('No se pudo crear la alerta. Inténtalo de nuevo.', 'error');
         }
-    }, [selectedCoin, createAlert]);
+    }, [selectedCoin, createAlert, showToast]);
 
     const handleAskAI = useCallback(async () => {
         if (!selectedCoin) return;
@@ -310,6 +311,18 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
     return (
         <>
             <div className="space-y-6">
+
+                {/* Banner no bloqueante: el polling falló pero hay datos previos.
+                    Sin esto, los precios se quedarían obsoletos en silencio. */}
+                {error && cryptos.length > 0 && (
+                    <div
+                        role="status"
+                        className="flex items-center gap-3 bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-bold px-4 py-3 rounded-xl"
+                    >
+                        <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse shrink-0" />
+                        Conexión con el mercado inestable — mostrando los últimos precios disponibles.
+                    </div>
+                )}
 
                 {/* ── Sección de Gráfico y Análisis ─────────────────────────── */}
                 {selectedCoin && (
@@ -475,18 +488,25 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                     )}
                                 </div>
 
+                                {/* El endpoint de IA requiere sesión (consume cuota de Groq) */}
                                 <button
                                     id="btn-analyze-ai"
                                     onClick={handleAskAI}
-                                    disabled={isAnalyzing}
+                                    disabled={isAnalyzing || !user}
                                     className={cn(
                                         'mt-4 w-full py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2',
                                         isAnalyzing
                                             ? 'bg-zinc-800 text-zinc-500 animate-pulse cursor-not-allowed'
-                                            : 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/20'
+                                            : !user
+                                                ? 'bg-zinc-800 text-zinc-500 cursor-not-allowed'
+                                                : 'bg-purple-600 hover:bg-purple-500 text-white shadow-lg shadow-purple-900/20'
                                     )}
                                 >
-                                    {isAnalyzing ? 'Generando...' : 'Analizar con IA'}
+                                    {isAnalyzing
+                                        ? 'Generando...'
+                                        : !user
+                                            ? 'Inicia sesión para usar IA'
+                                            : 'Analizar con IA'}
                                 </button>
                             </div>
                         </div>
@@ -619,20 +639,20 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                                     onClick={(e) => handleToggleFavorite(e, crypto.id)}
                                                     className={cn(
                                                         'p-2 rounded-lg transition-all transform active:scale-90',
-                                                        user.favorites.includes(crypto.id)
+                                                        user.favorites?.includes(crypto.id)
                                                             ? 'text-yellow-500 bg-yellow-500/10'
                                                             : 'text-zinc-500 hover:text-white hover:bg-zinc-800'
                                                     )}
                                                     aria-label={
-                                                        user.favorites.includes(crypto.id)
+                                                        user.favorites?.includes(crypto.id)
                                                             ? `Quitar ${crypto.name} de favoritos`
                                                             : `Añadir ${crypto.name} a favoritos`
                                                     }
-                                                    aria-pressed={user.favorites.includes(crypto.id)}
+                                                    aria-pressed={user.favorites?.includes(crypto.id)}
                                                 >
                                                     <Star
                                                         size={20}
-                                                        fill={user.favorites.includes(crypto.id) ? 'currentColor' : 'none'}
+                                                        fill={user.favorites?.includes(crypto.id) ? 'currentColor' : 'none'}
                                                     />
                                                 </button>
                                             )}
@@ -644,7 +664,11 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
 
                         {filteredCryptos.length === 0 && (
                             <div className="p-20 text-center text-zinc-500 italic">
-                                No se encontraron activos que coincidan con &ldquo;{searchTerm}&rdquo;
+                                {searchTerm.trim()
+                                    ? <>No se encontraron activos que coincidan con &ldquo;{searchTerm}&rdquo;</>
+                                    : filterFavorites
+                                        ? 'Aún no tienes favoritos. Marca la estrella de un activo para verlo aquí.'
+                                        : 'No hay activos disponibles en este momento.'}
                             </div>
                         )}
                     </div>

@@ -10,7 +10,6 @@ function resolveTypeScriptPlugin(): Plugin {
         name: 'resolve-ts-from-js',
         enforce: 'pre',
         resolveId(source, importer) {
-            console.log('resolveId:', source, importer);
             if (!source.endsWith('.js') || !importer) return null;
             
             const jsPath = resolve(dirname(importer), source);
@@ -32,8 +31,11 @@ export default defineConfig({
         environment: 'node',
         include:     ['src/backend/__tests__/**/*.test.ts'],
         isolate:     true,
+        // Cada suite levanta su propio ReplicaSet de MongoDB en memoria;
+        // ejecutarlas en serie evita 3 procesos mongod simultáneos (timeouts en CI/Windows).
+        fileParallelism: false,
         testTimeout: 30_000,
-        hookTimeout: 30_000,
+        hookTimeout: 120_000,
         env: {
             NODE_ENV:    'test',
             JWT_SECRET:  'test_jwt_secret_at_least_32_chars_long_for_hs256',

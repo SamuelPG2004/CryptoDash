@@ -21,6 +21,7 @@ import { useCallback } from 'react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import type { Crypto } from '../types/crypto';
+import type { PriceAlert } from '../types/user';
 
 // ─── Tipos ──────────────────────────────────────────────────────────────────────
 
@@ -79,9 +80,15 @@ export interface UseCryptoActionsReturn {
 export function useCryptoActions(): UseCryptoActionsReturn {
     const { user, updateFavorites, updateUser } = useAuth();
 
+    // Dependemos del booleano (no del objeto `user`): cualquier cambio de
+    // wallet/portfolio recreaba los callbacks y rompía la memoización de las filas.
+    const isAuthenticated = !!user;
+
     /**
      * Ejecuta una compra o venta de criptomoneda.
      * Actualiza el estado del usuario en AuthContext con los nuevos datos del wallet/portfolio.
+     * NOTA: el precio NO se envía — el servidor lo verifica desde su caché
+     * (previene price-injection; el schema Zod lo descartaría de todos modos).
      */
     const executeTrade = useCallback(async ({ coin, type, amount }: TradeParams): Promise<void> => {
         const { data } = await api.post(`/users/${type}`, {
@@ -89,7 +96,6 @@ export function useCryptoActions(): UseCryptoActionsReturn {
             symbol: coin.symbol,
             name:   coin.name,
             amount,
-            price:  coin.current_price,
         });
         updateUser(data);
     }, [updateUser]);
@@ -101,10 +107,10 @@ export function useCryptoActions(): UseCryptoActionsReturn {
      * @throws {Error} Si el usuario no está autenticado
      */
     const toggleFavorite = useCallback(async (coinId: string): Promise<void> => {
-        if (!user) throw new Error('Usuario no autenticado');
-        const { data } = await api.post('/users/favorites', { cryptoId: coinId });
+        if (!isAuthenticated) throw new Error('Usuario no autenticado');
+        const { data } = await api.post<{ favorites: string[] }>('/users/favorites', { cryptoId: coinId });
         updateFavorites(data.favorites);
-    }, [user, updateFavorites]);
+    }, [isAuthenticated, updateFavorites]);
 
     /**
      * Crea una alerta de precio.
@@ -114,16 +120,17 @@ export function useCryptoActions(): UseCryptoActionsReturn {
      * @throws {Error} Si el usuario no está autenticado o la petición falla
      */
     const createAlert = useCallback(async ({ coin, targetPrice }: AlertParams): Promise<void> => {
-        if (!user) throw new Error('Usuario no autenticado');
+        if (!isAuthenticated) throw new Error('Usuario no autenticado');
         const condition = targetPrice > coin.current_price ? 'above' : 'below';
-        const { data } = await api.post('/users/alerts', {
+        const { data } = await api.post<PriceAlert[]>('/users/alerts', {
             coinId:      coin.id,
             symbol:      coin.symbol,
             condition,
             targetPrice,
         });
-        updateUser({ ...user, alerts: data } as typeof user);
-    }, [user, updateUser]);
+        // updateUser hace merge parcial — no hace falta clonar el usuario entero
+        updateUser({ alerts: data });
+    }, [isAuthenticated, updateUser]);
 
     return { executeTrade, toggleFavorite, createAlert };
 }

@@ -277,6 +277,13 @@ export const addAlert = async (req: AuthRequest, res: Response, next: NextFuncti
             return;
         }
 
+        // Límite defensivo: evita el crecimiento sin tope del documento
+        // (BSON máx. 16MB) y mantiene acotado el ciclo del alertChecker.
+        if (user.alerts.length >= 50) {
+            res.status(400).json({ message: 'Has alcanzado el máximo de 50 alertas. Elimina alguna para crear otra.' });
+            return;
+        }
+
         user.alerts.push({
             id:          new Types.ObjectId().toString(),
             coinId,

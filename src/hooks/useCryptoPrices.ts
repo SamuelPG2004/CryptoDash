@@ -76,9 +76,9 @@ export function useCryptoPrices(): UseCryptoPricesReturn {
     const [loading, setLoading] = useState(true);
     const [error,   setError]   = useState<string | null>(null);
 
-    const fetchPrices = useCallback(async () => {
+    const fetchPrices = useCallback(async (signal?: AbortSignal) => {
         try {
-            const { data } = await api.get<RawCryptoApiItem[]>('/crypto/prices');
+            const { data } = await api.get<RawCryptoApiItem[]>('/crypto/prices', { signal });
 
             const normalized = data
                 .filter((item): item is RawCryptoApiItem => !!(item?.id && item?.symbol))
@@ -87,19 +87,28 @@ export function useCryptoPrices(): UseCryptoPricesReturn {
             setCryptos(normalized);
             setError(null);
         } catch (err: unknown) {
+            // Un abort no es un error real: el componente se desmontó o llegó
+            // una request más reciente — no tocar el estado.
+            if (signal?.aborted) return;
             const message = err instanceof Error ? err.message : 'Error desconocido';
             console.error('[useCryptoPrices] Error al obtener precios:', message);
             setError('No se pudieron cargar los datos del mercado. Reintentando...');
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) setLoading(false);
         }
     }, []);
 
     useEffect(() => {
-        fetchPrices();
-        const interval = setInterval(fetchPrices, POLL_INTERVAL_MS);
-        return () => clearInterval(interval); // Cleanup: evita memory leaks y llamadas zombie
+        // AbortController: cancela la request en vuelo al desmontar y evita
+        // que una respuesta antigua pise a una más reciente (out-of-order).
+        const controller = new AbortController();
+        fetchPrices(controller.signal);
+        const interval = setInterval(() => fetchPrices(controller.signal), POLL_INTERVAL_MS);
+        return () => {
+            controller.abort();
+            clearInterval(interval);
+        };
     }, [fetchPrices]);
 
-    return { cryptos, loading, error, refetch: fetchPrices };
+    return { cryptos, loading, error, refetch: () => fetchPrices() };
 }

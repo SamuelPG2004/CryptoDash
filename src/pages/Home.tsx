@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import CryptoTable from '../components/CryptoTable.tsx';
 import NewsPanel from '../components/NewsPanel.tsx';
 import Converter from '../components/Converter.tsx';
-import { TrendingUp, Shield, Zap, ArrowRight } from 'lucide-react';
+import { TrendingUp, Shield, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -11,18 +11,21 @@ const MarketTicker: React.FC = () => {
 
   useEffect(() => {
     // Fetch real prices from the backend (which caches CoinGecko)
+    let cancelled = false;
     const loadPrices = async () => {
       try {
         const res = await fetch('/api/crypto/prices');
         if (!res.ok) throw new Error('fetch failed');
-        const data = await res.json();
-        const top = data.slice(0, 6).map((c: any) => ({
+        const data: { symbol: string; price?: number; change?: number }[] = await res.json();
+        const top = data.slice(0, 6).map((c) => ({
           symbol: c.symbol,
           price: c.price ?? 0,
           change: c.change ?? 0,
         }));
+        if (cancelled) return;
         setPrices(top);
       } catch {
+        if (cancelled) return;
         // Fallback if API is not available
         setPrices([
           { symbol: 'BTC', price: 64231, change: 2.4 },
@@ -43,7 +46,10 @@ const MarketTicker: React.FC = () => {
         }))
       );
     }, 3000);
-    return () => clearInterval(interval);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   const tickerItems = prices.length > 0 ? [...prices, ...prices, ...prices, ...prices] : [];
