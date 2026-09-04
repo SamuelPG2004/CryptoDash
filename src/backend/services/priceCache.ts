@@ -22,6 +22,8 @@ interface CachedCoin {
   change: number;
   image: string;
   sparkline: number[];
+  /** Volumen de trading 24h en USD — usado por el análisis de IA */
+  volume: number;
 }
 
 /** Forma cruda de un item de /coins/markets de CoinGecko (solo los campos usados) */
@@ -33,6 +35,7 @@ interface CoinGeckoMarketItem {
   price_change_percentage_24h?: number;
   image?: string;
   sparkline_in_7d?: { price?: number[] };
+  total_volume?: number;
 }
 
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -79,6 +82,7 @@ export function refreshPriceCache(): Promise<void> {
           change: coin.price_change_percentage_24h || 0,
           image: coin.image || '',
           sparkline: coin.sparkline_in_7d?.price || [],
+          volume: coin.total_volume || 0,
         }));
 
       lastFetchTime = Date.now();

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import CryptoTable from '../components/CryptoTable.tsx';
 import NewsPanel from '../components/NewsPanel.tsx';
 import Converter from '../components/Converter.tsx';
-import { TrendingUp, Shield, ArrowRight } from 'lucide-react';
+import { TrendingUp, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 
@@ -145,18 +145,6 @@ const Home: React.FC = () => {
             {/* Sidebar News */}
             <div className="space-y-8 pb-12 pt-4">
               <NewsPanel />
-
-              {/* Feature Cards in Sidebar */}
-              <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 p-8 rounded-3xl text-white shadow-2xl shadow-emerald-900/20 relative overflow-hidden group">
-                <div className="absolute -right-4 -bottom-4 opacity-10 group-hover:scale-110 transition-transform">
-                  <Shield size={120} />
-                </div>
-                <h3 className="text-xl font-black mb-2">Seguridad VIP</h3>
-                <p className="text-emerald-100 text-sm leading-relaxed mb-6">Protegemos tus activos con los más altos estándares criptográficos.</p>
-                <button className="bg-white/10 hover:bg-white/20 backdrop-blur-sm text-white text-xs font-bold uppercase tracking-widest py-3 px-6 rounded-xl transition-all">
-                  Saber más
-                </button>
-              </div>
             </div>
           </div>
         </div>

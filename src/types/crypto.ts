@@ -31,6 +31,8 @@ export interface Crypto {
     image: string;
     /** Array de precios históricos para el sparkline (últimas ~168 horas) */
     sparkline: number[];
+    /** Volumen de trading 24h en USD (0 si la fuente no lo provee) */
+    total_volume: number;
 }
 
 /**
@@ -41,7 +43,12 @@ export interface ChartDataPoint {
     time: number;
     /** Precio en USD en ese punto */
     price: number;
+    /** Timestamp aproximado del punto (epoch ms) — el sparkline es horario */
+    ts: number;
 }
+
+/** Rango temporal visible en el gráfico de área */
+export type ChartRange = '24h' | '7d';
 
 /**
  * Indicadores técnicos calculados a partir del sparkline.
@@ -92,4 +99,5 @@ export interface RawCryptoApiItem {
     change?: number;
     image?: string;
     sparkline?: number[];
+    volume?: number;
 }

@@ -45,6 +45,7 @@ function mapApiItemToCrypto(item: RawCryptoApiItem): Crypto {
         price_change_percentage_24h: item.change    ?? 0,
         image:                       item.image     ?? '',
         sparkline:                   item.sparkline ?? [],
+        total_volume:                item.volume    ?? 0,
     };
 }
 

@@ -64,7 +64,7 @@ import { useCryptoPrices } from '../hooks/useCryptoPrices';
 import { useCryptoActions } from '../hooks/useCryptoActions';
 import TradeModal from './TradeModal';
 import { CoinLogo } from './CoinLogo';
-import type { Crypto, ChartDataPoint, TechnicalIndicators, TradeModalState } from '../types/crypto';
+import type { Crypto, ChartDataPoint, ChartRange, TechnicalIndicators, TradeModalState } from '../types/crypto';
 
 // ─── Sub-componentes puros ─────────────────────────────────────────────────────
 
@@ -92,20 +92,25 @@ const ErrorState: React.FC<{ message: string }> = ({ message }) => (
 /** Props del tooltip personalizado de Recharts */
 interface ChartTooltipProps {
     active?: boolean;
-    payload?: Array<{ value: number }>;
+    payload?: Array<{ value: number; payload: ChartDataPoint }>;
 }
 
 /**
  * Tooltip personalizado para el gráfico de área.
- * Componente puro — no tiene estado ni efectos secundarios.
+ * Muestra el precio y la fecha/hora aproximada del punto (serie horaria).
  */
 const ChartTooltip: React.FC<ChartTooltipProps> = ({ active, payload }) => {
     if (!active || !payload?.length) return null;
+    const point = payload[0].payload;
     return (
         <div className="bg-zinc-900 border border-zinc-800 p-4 rounded-xl shadow-2xl backdrop-blur-md">
-            <p className="text-zinc-500 text-[10px] font-black uppercase mb-1">Punto de Datos</p>
+            <p className="text-zinc-500 text-[10px] font-black uppercase mb-1">
+                {new Date(point.ts).toLocaleString('es-ES', {
+                    day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit',
+                })}
+            </p>
             <p className="text-white font-mono font-bold text-lg">
-                ${payload[0].value.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                ${payload[0].value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
         </div>
     );
@@ -201,6 +206,7 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
     const [selectedCoinId, setSelectedCoinId] = useState<string | null>(null);
     const [tradeModal,     setTradeModal]     = useState<TradeModalState>({ open: false, type: 'buy' });
     const [showAlertPanel, setShowAlertPanel] = useState(false);
+    const [chartRange,     setChartRange]     = useState<ChartRange>('7d');
 
     // ── Datos derivados con memoización ───────────────────────────────────────
 
@@ -226,10 +232,32 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
         [cryptos, selectedCoinId]
     );
 
-    const chartData = useMemo<ChartDataPoint[]>(
-        () => (selectedCoin?.sparkline ?? []).map((price, time) => ({ time, price })),
-        [selectedCoin]
-    );
+    // El sparkline de CoinGecko es horario (~168 puntos = 7 días).
+    // Para 24H tomamos las últimas 24 horas; el ts permite mostrar
+    // fecha/hora real en el tooltip.
+    const chartData = useMemo<ChartDataPoint[]>(() => {
+        const spark  = selectedCoin?.sparkline ?? [];
+        const points = chartRange === '24h' ? spark.slice(-24) : spark;
+        const now    = Date.now();
+        const HOUR   = 3_600_000;
+        return points.map((price, i) => ({
+            time: i,
+            price,
+            ts: now - (points.length - 1 - i) * HOUR,
+        }));
+    }, [selectedCoin, chartRange]);
+
+    // Máximo y mínimo del rango visible — contexto rápido para el usuario
+    const rangeStats = useMemo(() => {
+        if (chartData.length === 0) return null;
+        let high = -Infinity;
+        let low  = Infinity;
+        for (const { price } of chartData) {
+            if (price > high) high = price;
+            if (price < low)  low  = price;
+        }
+        return { high, low };
+    }, [chartData]);
 
     const indicators = useMemo<TechnicalIndicators | null>(() => {
         const prices = selectedCoin?.sparkline ?? [];
@@ -296,7 +324,8 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
         await analyzeWithAI({
             symbol:    selectedCoin.symbol,
             price:     String(selectedCoin.current_price),
-            volume:    '0',
+            // Volumen real de 24h — antes se enviaba '0' y el modelo analizaba con un dato falso
+            volume:    String(selectedCoin.total_volume),
             change24h: String(selectedCoin.price_change_percentage_24h),
         });
     }, [selectedCoin, analyzeWithAI]);
@@ -440,7 +469,26 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                         {/* Gráfico + Panel IA */}
                         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8 mb-6 relative z-10">
                             {/* Gráfico de área */}
-                            <div className="lg:col-span-3 h-[300px] w-full">
+                            <div className="lg:col-span-3 w-full">
+                                {/* Selector de rango temporal */}
+                                <div className="flex justify-end gap-1 mb-2">
+                                    {(['24h', '7d'] as const).map((range) => (
+                                        <button
+                                            key={range}
+                                            onClick={() => setChartRange(range)}
+                                            aria-pressed={chartRange === range}
+                                            className={cn(
+                                                'px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all',
+                                                chartRange === range
+                                                    ? 'bg-emerald-600 text-white'
+                                                    : 'bg-zinc-900 text-zinc-500 hover:text-white border border-zinc-800'
+                                            )}
+                                        >
+                                            {range === '24h' ? '24H' : '7D'}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="h-[300px] w-full">
                                 <ResponsiveContainer width="100%" height="100%">
                                     <AreaChart data={chartData}>
                                         <defs>
@@ -457,13 +505,14 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                             type="monotone"
                                             dataKey="price"
                                             stroke={trendColor}
-                                            strokeWidth={4}
+                                            strokeWidth={3}
                                             fillOpacity={1}
                                             fill="url(#colorPrice)"
-                                            animationDuration={2000}
+                                            animationDuration={600}
                                         />
                                     </AreaChart>
                                 </ResponsiveContainer>
+                                </div>
                             </div>
 
                             {/* Panel de IA */}
@@ -479,9 +528,39 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                                     {aiError ? (
                                         <p className="text-rose-400 text-xs leading-relaxed">{aiError}</p>
                                     ) : aiAnalysis ? (
-                                        <p className="text-zinc-400 text-xs leading-relaxed italic border-l-2 border-purple-500/30 pl-3">
-                                            {aiAnalysis.justificacion || aiAnalysis.raw}
-                                        </p>
+                                        <div className="space-y-3">
+                                            {/* Sentimiento — badge con color semántico */}
+                                            <span className={cn(
+                                                'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest',
+                                                aiAnalysis.sentiment === 'ALCISTA'
+                                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                                                    : aiAnalysis.sentiment === 'BAJISTA'
+                                                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                                                        : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                                            )}>
+                                                {aiAnalysis.sentiment === 'ALCISTA' ? <ArrowUpRight size={12} />
+                                                    : aiAnalysis.sentiment === 'BAJISTA' ? <ArrowDownRight size={12} /> : null}
+                                                {aiAnalysis.sentiment}
+                                            </span>
+
+                                            {/* Soporte y resistencia estimados por el modelo */}
+                                            {(aiAnalysis.soporte !== '-' || aiAnalysis.resistencia !== '-') && (
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-2">
+                                                        <p className="text-zinc-600 text-[9px] font-black uppercase tracking-widest">Soporte</p>
+                                                        <p className="text-emerald-400/90 font-mono text-xs font-bold">${aiAnalysis.soporte}</p>
+                                                    </div>
+                                                    <div className="bg-zinc-950/60 border border-zinc-800 rounded-lg p-2">
+                                                        <p className="text-zinc-600 text-[9px] font-black uppercase tracking-widest">Resistencia</p>
+                                                        <p className="text-rose-400/90 font-mono text-xs font-bold">${aiAnalysis.resistencia}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <p className="text-zinc-400 text-xs leading-relaxed italic border-l-2 border-purple-500/30 pl-3">
+                                                {aiAnalysis.justificacion || aiAnalysis.raw}
+                                            </p>
+                                        </div>
                                     ) : (
                                         <p className="text-zinc-600 text-[10px] uppercase font-bold tracking-widest text-center py-10">
                                             Pulsa para analizar tendencia
@@ -513,8 +592,17 @@ const CryptoTable: React.FC<CryptoTableProps> = ({ filterFavorites }) => {
                         </div>
 
                         {/* Footer de indicadores técnicos */}
-                        <div className="mt-6 flex items-center justify-between text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em]">
-                            <span>Historial 7D</span>
+                        <div className="mt-6 flex flex-wrap items-center justify-between gap-2 text-zinc-600 text-[10px] font-black uppercase tracking-[0.3em]">
+                            <span className="flex items-center gap-3">
+                                Historial {chartRange === '24h' ? '24H' : '7D'}
+                                {rangeStats && (
+                                    <span className="tracking-normal font-mono normal-case text-zinc-500">
+                                        <span className="text-emerald-500/70">▲ ${rangeStats.high.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                                        {' · '}
+                                        <span className="text-rose-500/70">▼ ${rangeStats.low.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                                    </span>
+                                )}
+                            </span>
                             {indicators ? (
                                 <div className="flex gap-4">
                                     {indicators.sma !== null && (
