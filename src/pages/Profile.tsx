@@ -785,8 +785,8 @@ const Profile: React.FC = () => {
                             <Wallet className="text-emerald-500" size={20} /> Mi Portafolio
                         </h3>
 
-                        {/* Métricas del portfolio */}
-                        <div className="flex gap-6">
+                        {/* Métricas del portfolio — flex-wrap: en móvil los dos montos no caben en una fila */}
+                        <div className="flex flex-wrap gap-4 sm:gap-6">
                             <div className="text-right">
                                 <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-black mb-1">Saldo Disponible</p>
                                 <p className="text-2xl font-black text-white font-mono">
